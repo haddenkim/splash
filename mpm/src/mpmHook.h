@@ -1,9 +1,10 @@
 #include "PhysicsHook.h"
 
+#include "gui/ui.h"
 #include "settings/renderSettings.h"
 #include "settings/simParameters.h"
 #include "state/system.h"
-#include "gui/ui.h"
+#include "stats.h"
 
 class Solver;
 
@@ -26,21 +27,24 @@ public:
 	void mouseClicked(double x, double y, int button) override;
 
 	// libigl render data
-	Eigen::MatrixXd particlePositions;
-	Eigen::MatrixXd particleColors;
-	Eigen::MatrixXd gridPositions;
-	Eigen::MatrixXd gridColors;
-	Eigen::MatrixXd meshV;
-	Eigen::MatrixXi meshF;
+	Eigen::MatrixXd particlePositions_;
+	Eigen::MatrixXd particleColors_;
+	Eigen::MatrixXd gridPositions_;
+	Eigen::MatrixXd gridColors_;
+	Eigen::MatrixXd meshV_;
+	Eigen::MatrixXi meshF_;
 
 	// settings
-	RenderSettings m_renderSettings;
-	SimParameters m_simParameters;
+	RenderSettings renderSettings_;
+	SimParameters  simParameters_;
 
 	// simulation
-	System m_system;
-	Solver* m_solver;
+	System  system_;
+	Solver* solver_;
 
 	// GUI
-	UI m_ui;
+	UI ui_;
+
+	// stats
+	Stats stats_;
 };

@@ -11,7 +11,7 @@ class System;
 
 class UI {
 public:
-	UI(RenderSettings& renderSettings, SimParameters& simParameters, const System& system);
+	UI(RenderSettings& renderSettings, SimParameters& simParameters, const System& system, const Stats& stats);
 
 	void draw();
 

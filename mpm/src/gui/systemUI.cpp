@@ -60,6 +60,9 @@ void SystemUI::displayParticleData()
 		Text("%0.2f %0.2f %0.2f", particle.velocity.x(), particle.velocity.y(), particle.velocity.z());
 		NextColumn();
 	}
+
+		ImGui::Columns(1);
+
 }
 
 void SystemUI::displayNodeData()

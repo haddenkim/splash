@@ -9,10 +9,10 @@ using namespace Eigen;
 
 MpmHook::MpmHook()
 	: PhysicsHook()
-	, m_system(Vector3d(0.5, 0.5, 0.5), Vector3d(10, 10, 0))
-	, m_ui(m_renderSettings, m_simParameters, m_system)
+	, system_(Vector3d(0.5, 0.5, 0.5), Vector3d(10, 10, 0))
+	, ui_(renderSettings_, simParameters_, system_, stats_)
 {
-	m_solver = new SerialSolver();
+	solver_ = new SerialSolver();
 }
 
 void MpmHook::drawGUI()
@@ -20,18 +20,25 @@ void MpmHook::drawGUI()
 	ImGui::Separator();
 
 	// draw sub UIs
-	m_ui.draw();
+	ui_.draw();
 }
 
 void MpmHook::initSimulation()
 {
+	// clear system particles
+	system_.clearParticles();
+
+
 	double partMass = 1.0;
 	double partVol  = 1.0;
 
-	m_system.addParticle(partMass, partVol, 0, 0, 0, 1, 0, 0);
-	m_system.addParticle(partMass, partVol, 0, 0.75, 0, 1, 0, 0);
-	m_system.addParticle(partMass, partVol, 0.25, 1.25, 0, 1, 0, 0);
-	m_system.addParticle(partMass, partVol, 2.75, 2.75, 0, 1, 0, 0);
+	system_.addParticle(partMass, partVol, 0, 0, 0, 1, 0, 0);
+	system_.addParticle(partMass, partVol, 0, 0.75, 0, 1, 0, 0);
+	system_.addParticle(partMass, partVol, 0.25, 1.25, 0, 1, 0, 0);
+	system_.addParticle(partMass, partVol, 2.75, 2.75, 0, 1, 0, 0);
+
+	// reset stats
+	stats_.simTime = 0.f;
 }
 
 void MpmHook::tick()
@@ -41,40 +48,45 @@ void MpmHook::tick()
 bool MpmHook::simulateOneStep()
 {
 
-	m_solver->simulateOneTick(m_system, m_simParameters);
+	solver_->simulateOneTick(system_, simParameters_);
+
+	// update stats
+	stats_.simTime += simParameters_.timestep;
+
+	return false;
 }
 
 void MpmHook::updateRenderGeometry()
 {
 	// particles
-	int psize = m_system.particles_.size();
-	particlePositions.resize(psize, 3);
+	int psize = system_.particles_.size();
+	particlePositions_.resize(psize, 3);
 	for (int i = 0; i < psize; i++) {
-		particlePositions.block<1, 3>(i, 0) = m_system.particles_[i].position;
+		particlePositions_.block<1, 3>(i, 0) = system_.particles_[i].position;
 	}
 
-	particleColors.resize(psize, 3);
-	particleColors.setConstant(1.0);
+	particleColors_.resize(psize, 3);
+	particleColors_.setConstant(1.0);
 
 	// grid
-	int gsize = m_system.nodes_.size();
-	gridPositions.resize(gsize, 3);
+	int gsize = system_.nodes_.size();
+	gridPositions_.resize(gsize, 3);
 	for (int i = 0; i < gsize; i++) {
-		gridPositions.block<1, 3>(i, 0) = m_system.nodes_[i].position;
+		gridPositions_.block<1, 3>(i, 0) = system_.nodes_[i].position;
 	}
 
-	gridColors.resize(gsize, 3);
-	gridColors.setConstant(0.0);
+	gridColors_.resize(gsize, 3);
+	gridColors_.setConstant(0.0);
 
 	// floor
-	meshV.resize(4, 3);
-	meshV << 0, 0, 0,
+	meshV_.resize(4, 3);
+	meshV_ << 0, 0, 0,
 		10, 0, 0,
 		0, 0, 10,
 		10, 0, 10;
 
-	meshF.resize(2, 3);
-	meshF << 0, 3, 1,
+	meshF_.resize(2, 3);
+	meshF_ << 0, 3, 1,
 		0, 2, 3;
 }
 
@@ -84,18 +96,18 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 	viewer.data().clear();
 
 	// add particles
-	if (m_renderSettings.m_showParticles) {
-		viewer.data().add_points(particlePositions, particleColors);
+	if (renderSettings_.m_showParticles) {
+		viewer.data().add_points(particlePositions_, particleColors_);
 	}
 
-	if (m_renderSettings.m_showGrid) {
+	if (renderSettings_.m_showGrid) {
 		viewer.data().point_size = 10.f;
-		viewer.data().add_points(gridPositions, gridColors);
+		viewer.data().add_points(gridPositions_, gridColors_);
 	}
 
 	// floor
-	if (m_renderSettings.m_showFloor) {
-		viewer.data().set_mesh(meshV, meshF);
+	if (renderSettings_.m_showFloor) {
+		viewer.data().set_mesh(meshV_, meshF_);
 	}
 }
 

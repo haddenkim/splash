@@ -1,10 +1,10 @@
 #include "ui.h"
 #include <imgui/imgui.h>
 
-UI::UI(RenderSettings& renderSettings, SimParameters& simParameters, const System& system)
+UI::UI(RenderSettings& renderSettings, SimParameters& simParameters, const System& system, const Stats& stats)
 	: parametersUI_(simParameters)
 	, renderUI_(renderSettings)
-	, statsUI_()
+	, statsUI_(stats)
 	, systemUI_(system)
 {
 	showParameters_ = false;

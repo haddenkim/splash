@@ -39,7 +39,7 @@ public:
 	}
 
 	// libigl
-	igl::opengl::glfw::Viewer viewer;
+	igl::opengl::glfw::Viewer			viewer;
 	igl::opengl::glfw::imgui::ImGuiMenu menu;
 
 	// libigl callbacks
@@ -61,7 +61,7 @@ public:
 	static bool mouseCallback(igl::opengl::glfw::Viewer& viewer, int button, int modifier)
 	{
 		Eigen::Vector3f pos(viewer.down_mouse_x, viewer.down_mouse_y, 0);
-		Eigen::Matrix4f model = viewer.core.view;
+		Eigen::Matrix4f model  = viewer.core.view;
 		Eigen::Vector3f unproj = igl::unproject(pos, model, viewer.core.proj, viewer.core.viewport);
 		hook->mouseClicked(unproj[0], -unproj[1], button);
 
@@ -76,9 +76,19 @@ public:
 	static void drawGUI()
 	{
 		if (ImGui::CollapsingHeader("Simulation Control", ImGuiTreeNodeFlags_DefaultOpen)) {
+			bool isRunning = !hook->isPaused();
+			if (isRunning) {
+				ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 255)); // green
+			}
+
 			if (ImGui::Button("Run/Pause Sim", ImVec2(-1, 0))) {
 				hook->toggleSimulation();
 			}
+
+			if (isRunning) {
+				ImGui::PopStyleColor();
+			}
+
 			if (ImGui::Button("Reset Sim", ImVec2(-1, 0))) {
 				hook->reset();
 			}
