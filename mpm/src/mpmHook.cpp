@@ -10,7 +10,7 @@ using namespace Eigen;
 MpmHook::MpmHook()
 	: PhysicsHook()
 	, m_system(Vector3d(0.5, 0.5, 0.5), Vector3d(10, 10, 0))
-	, m_ui(m_renderSettings, m_simParameters)
+	, m_ui(m_renderSettings, m_simParameters, m_system)
 {
 	m_solver = new SerialSolver();
 }
