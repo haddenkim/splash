@@ -76,6 +76,9 @@ void MpmHook::updateRenderGeometry()
 	{
 		int gsize = system_.nodes_.size();
 		gridActivePositions_.resize(system_.activeNodes_, 3);
+		gridVelocities_.resize(system_.activeNodes_, 3);
+		gridForces_.resize(system_.activeNodes_, 3);
+
 		gridInactivePositions_.resize(gsize - system_.activeNodes_, 3);
 
 		int activeNI   = 0;
@@ -84,6 +87,8 @@ void MpmHook::updateRenderGeometry()
 		for (const Node& node : system_.nodes_) {
 			if (node.active) {
 				gridActivePositions_.block<1, 3>(activeNI, 0) = node.position;
+				gridVelocities_.block<1, 3>(activeNI, 0)	  = node.velocity;
+				gridForces_.block<1, 3>(activeNI, 0)		  = node.force;
 				activeNI++;
 			} else {
 				gridInactivePositions_.block<1, 3>(inactiveNI, 0) = node.position;
@@ -133,6 +138,14 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 	}
 	if (renderSettings_.showActiveGrid || renderSettings_.showGrid) {
 		viewer.data().add_points(gridActivePositions_, gridActiveColors_);
+	}
+	if (renderSettings_.showGridVelocity) {
+		const RowVector3d black(0, 0, 0);
+		viewer.data().add_edges(gridActivePositions_, gridActivePositions_ + gridVelocities_, black);
+	}
+	if (renderSettings_.showGridForce) {
+		const RowVector3d red(1, 0, 0);
+		viewer.data().add_edges(gridActivePositions_, gridActivePositions_ + gridForces_, red);
 	}
 
 	// floor

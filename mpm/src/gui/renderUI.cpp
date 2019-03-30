@@ -18,6 +18,8 @@ void RenderUI::draw()
 	ImGui::NewLine();
 	ImGui::Checkbox("Active Grid", &renderSettings_.showActiveGrid);
 	ImGui::Checkbox("Full Grid", &renderSettings_.showGrid);
+	ImGui::Checkbox("Grid Velocity", &renderSettings_.showGridVelocity);
+	ImGui::Checkbox("Grid Force", &renderSettings_.showGridForce);
 
 	ImGui::NewLine();
 	ImGui::Checkbox("Floor", &renderSettings_.showFloor);

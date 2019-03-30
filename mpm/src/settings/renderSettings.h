@@ -28,6 +28,7 @@ struct RenderSettings {
 	bool showGrid;
 	bool showActiveGrid;
 	bool showGridVelocity;
+	bool showGridForce;
 
 	bool showFloor;
 };

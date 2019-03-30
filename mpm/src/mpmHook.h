@@ -34,6 +34,8 @@ public:
 	Eigen::MatrixXd gridActivePositions_;
 	Eigen::MatrixXd gridInactivePositions_;
 	Eigen::MatrixXd gridActiveColors_;
+	Eigen::MatrixXd gridVelocities_;
+	Eigen::MatrixXd gridForces_;
 
 	Eigen::MatrixXd meshV_;
 	Eigen::MatrixXi meshF_;
