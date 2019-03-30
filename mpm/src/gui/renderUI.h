@@ -9,5 +9,5 @@ public:
 	void draw();
 
 private:
-	RenderSettings& m_renderSettings;
+	RenderSettings& renderSettings_;
 };

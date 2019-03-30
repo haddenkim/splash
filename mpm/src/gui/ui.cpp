@@ -15,6 +15,15 @@ UI::UI(RenderSettings& renderSettings, SimParameters& simParameters, const Syste
 
 void UI::draw()
 {
+	if (ImGui::CollapsingHeader("Additional UI", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::MenuItem("Sim Parameters", NULL, &showParameters_);
+		ImGui::MenuItem("Renderer", NULL, &showRender_);
+		ImGui::MenuItem("Stats", NULL, &showStats_);
+		ImGui::MenuItem("System", NULL, &showSystem_);
+	}
+
+	ImGui::Separator();
+
 	if (showParameters_) {
 		parametersUI_.draw();
 	}
@@ -26,17 +35,5 @@ void UI::draw()
 	}
 	if (showSystem_) {
 		systemUI_.draw();
-	}
-
-	if (ImGui::BeginMainMenuBar()) {
-		if (ImGui::BeginMenu("Windows")) {
-			ImGui::MenuItem("Sim Parameters", NULL, &showParameters_);
-			ImGui::MenuItem("Renderer", NULL, &showRender_);
-			ImGui::MenuItem("Stats", NULL, &showStats_);
-			ImGui::MenuItem("System", NULL, &showSystem_);
-
-			ImGui::EndMenu();
-		}
-		ImGui::EndMainMenuBar();
 	}
 }

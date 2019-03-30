@@ -28,7 +28,6 @@ void MpmHook::initSimulation()
 	// clear system particles
 	system_.clearParticles();
 
-
 	double partMass = 1.0;
 	double partVol  = 1.0;
 
@@ -59,35 +58,55 @@ bool MpmHook::simulateOneStep()
 void MpmHook::updateRenderGeometry()
 {
 	// particles
-	int psize = system_.particles_.size();
-	particlePositions_.resize(psize, 3);
-	for (int i = 0; i < psize; i++) {
-		particlePositions_.block<1, 3>(i, 0) = system_.particles_[i].position;
-	}
+	{
+		int psize = system_.particles_.size();
+		particlePositions_.resize(psize, 3);
+		particleVelocities_.resize(psize, 3);
 
-	particleColors_.resize(psize, 3);
-	particleColors_.setConstant(1.0);
+		for (int i = 0; i < psize; i++) {
+			particlePositions_.block<1, 3>(i, 0)  = system_.particles_[i].position;
+			particleVelocities_.block<1, 3>(i, 0) = system_.particles_[i].velocity;
+		}
+
+		particleColors_.resize(psize, 3);
+		particleColors_.setConstant(1.0);
+	}
 
 	// grid
-	int gsize = system_.nodes_.size();
-	gridPositions_.resize(gsize, 3);
-	for (int i = 0; i < gsize; i++) {
-		gridPositions_.block<1, 3>(i, 0) = system_.nodes_[i].position;
+	{
+		int gsize = system_.nodes_.size();
+		gridActivePositions_.resize(system_.activeNodes_, 3);
+		gridInactivePositions_.resize(gsize - system_.activeNodes_, 3);
+
+		int activeNI   = 0;
+		int inactiveNI = 0;
+
+		for (const Node& node : system_.nodes_) {
+			if (node.active) {
+				gridActivePositions_.block<1, 3>(activeNI, 0) = node.position;
+				activeNI++;
+			} else {
+				gridInactivePositions_.block<1, 3>(inactiveNI, 0) = node.position;
+				inactiveNI++;
+			}
+		}
+
+		gridActiveColors_.resize(system_.activeNodes_, 3);
+		gridActiveColors_.setConstant(0.0);
 	}
 
-	gridColors_.resize(gsize, 3);
-	gridColors_.setConstant(0.0);
-
 	// floor
-	meshV_.resize(4, 3);
-	meshV_ << 0, 0, 0,
-		10, 0, 0,
-		0, 0, 10,
-		10, 0, 10;
+	{
+		meshV_.resize(4, 3);
+		meshV_ << 0, 0, 0,
+			10, 0, 0,
+			0, 0, 10,
+			10, 0, 10;
 
-	meshF_.resize(2, 3);
-	meshF_ << 0, 3, 1,
-		0, 2, 3;
+		meshF_.resize(2, 3);
+		meshF_ << 0, 3, 1,
+			0, 2, 3;
+	}
 }
 
 void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
@@ -95,18 +114,29 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 
 	viewer.data().clear();
 
-	// add particles
-	if (renderSettings_.m_showParticles) {
+	viewer.data().point_size = renderSettings_.pointSize;
+	viewer.data().line_width = renderSettings_.lineWidth;
+
+	// particles
+	if (renderSettings_.showParticles) {
 		viewer.data().add_points(particlePositions_, particleColors_);
 	}
+	if (renderSettings_.showParticleVelocity) {
+		const RowVector3d black(0, 0, 0);
+		viewer.data().add_edges(particlePositions_, particlePositions_ + particleVelocities_, black);
+	}
 
-	if (renderSettings_.m_showGrid) {
-		viewer.data().point_size = 10.f;
-		viewer.data().add_points(gridPositions_, gridColors_);
+	// grid
+	if (renderSettings_.showGrid) {
+		const RowVector3d black(0, 0, 0);
+		viewer.data().add_points(gridInactivePositions_, black);
+	}
+	if (renderSettings_.showActiveGrid || renderSettings_.showGrid) {
+		viewer.data().add_points(gridActivePositions_, gridActiveColors_);
 	}
 
 	// floor
-	if (renderSettings_.m_showFloor) {
+	if (renderSettings_.showFloor) {
 		viewer.data().set_mesh(meshV_, meshF_);
 	}
 }

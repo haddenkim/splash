@@ -7,6 +7,7 @@ struct Node {
 	Node(int index, Eigen::Vector3d position)
 		: gridIndex(index)
 		, position(position)
+		, active(false)
 	{
 	}
 

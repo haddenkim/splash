@@ -2,13 +2,23 @@
 #include <imgui/imgui.h>
 
 RenderUI::RenderUI(RenderSettings& renderSettings)
-	: m_renderSettings(renderSettings)
+	: renderSettings_(renderSettings)
 {
 }
 
 void RenderUI::draw()
 {
-	ImGui::Checkbox("Show Particles", &m_renderSettings.m_showParticles);
-	ImGui::Checkbox("Show Grid", &m_renderSettings.m_showGrid);
-	ImGui::Checkbox("Show Floor", &m_renderSettings.m_showFloor);
+	ImGui::SliderFloat("Point Size", &renderSettings_.pointSize, 0.1f, 20.0f);
+	ImGui::SliderFloat("Line Width", &renderSettings_.lineWidth, 0.1f, 10.0f);
+
+	ImGui::Text("Show:");
+	ImGui::Checkbox("Particles", &renderSettings_.showParticles);
+	ImGui::Checkbox("Particle Velocity", &renderSettings_.showParticleVelocity);
+
+	ImGui::NewLine();
+	ImGui::Checkbox("Active Grid", &renderSettings_.showActiveGrid);
+	ImGui::Checkbox("Full Grid", &renderSettings_.showGrid);
+
+	ImGui::NewLine();
+	ImGui::Checkbox("Floor", &renderSettings_.showFloor);
 }

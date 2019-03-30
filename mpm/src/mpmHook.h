@@ -29,8 +29,12 @@ public:
 	// libigl render data
 	Eigen::MatrixXd particlePositions_;
 	Eigen::MatrixXd particleColors_;
-	Eigen::MatrixXd gridPositions_;
-	Eigen::MatrixXd gridColors_;
+	Eigen::MatrixXd particleVelocities_;
+
+	Eigen::MatrixXd gridActivePositions_;
+	Eigen::MatrixXd gridInactivePositions_;
+	Eigen::MatrixXd gridActiveColors_;
+
 	Eigen::MatrixXd meshV_;
 	Eigen::MatrixXi meshF_;
 
