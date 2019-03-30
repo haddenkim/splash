@@ -31,6 +31,10 @@ public:
 		// libigl GUI
 		viewer.plugins.push_back(&menu);
 		menu.callback_draw_viewer_menu = drawGUI;
+
+		// initial camera position
+		viewer.core.camera_eye	= Eigen::Vector3f(5, 5, 15);
+		viewer.core.camera_center = Eigen::Vector3f(5, 0, 5);
 	}
 
 	void start()
