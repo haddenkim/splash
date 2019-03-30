@@ -4,7 +4,7 @@ struct SimParameters {
 	SimParameters()
 	{
 		// default settings
-		timestep = 0.1f;
+		timestep = 0.001f;
 	};
 	
 	float timestep;

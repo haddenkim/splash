@@ -9,7 +9,7 @@ using namespace Eigen;
 
 MpmHook::MpmHook()
 	: PhysicsHook()
-	, system_(Vector3d(0.5, 0.5, 0.5), Vector3d(10, 10, 0))
+	, system_(Vector3d(0.5, 0.5, 0.5), Vector3d(4, 4, 4))
 	, ui_(renderSettings_, simParameters_, system_, stats_)
 {
 	solver_ = new SerialSolver();
@@ -32,10 +32,10 @@ void MpmHook::initSimulation()
 	double partMass = 1.0;
 	double partVol  = 1.0;
 
-	system_.addParticle(partMass, partVol, 0, 0, 0, 1, 0, 0);
-	system_.addParticle(partMass, partVol, 0, 0.75, 0, 1, 0, 0);
-	system_.addParticle(partMass, partVol, 0.25, 1.25, 0, 1, 0, 0);
-	system_.addParticle(partMass, partVol, 2.75, 2.75, 0, 1, 0, 0);
+	system_.addParticle(partMass, partVol, 1.2, 1.2, 1.2, 0.1, 0, 0);
+	// system_.addParticle(partMass, partVol, 0.00, 0.75, 0, 0.1, 0, 0);
+	// system_.addParticle(partMass, partVol, 0.25, 1.25, 0, 0.1, 0, 0);
+	// system_.addParticle(partMass, partVol, 2.75, 2.75, 0, 0.1, 0, 0);
 
 	// reset stats
 	stats_.simTime = 0.f;

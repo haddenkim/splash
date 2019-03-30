@@ -10,6 +10,8 @@ struct Particle {
 		, position(position)
 		, velocity(velocity)
 	{
+		affineState.setZero();
+		deformationGradient.setIdentity();
 	}
 
 	double mass;

@@ -18,5 +18,6 @@ struct Node {
 	Eigen::Vector3d velocity;
 
 	// grid timestep
+	bool active;
 	Eigen::Vector3d force;
 };

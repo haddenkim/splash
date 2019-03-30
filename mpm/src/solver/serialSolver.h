@@ -15,7 +15,7 @@ private:
 	static void resetGrid(System& system);
 	static void computeParticleNodeLinks(System& system);
 	static void transferParticleToGrid(System& system, const float timestep);
-	// compute grid DoF
+	static void identifyDegreesOfFreedom(System& system);
 	static void computeGridForces(System& system, const SimParameters& parameters);
 	static void updateGridVelocities(System& system, const float timestep);
 	static void transferGridToParticle(System& system, const float timestep);

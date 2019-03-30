@@ -21,9 +21,10 @@ void SerialSolver::simulateOneTick(System& system, const SimParameters parameter
 	transferParticleToGrid(system, parameters.timestep);
 
 	/* Identify grid degrees of freedom */
+	identifyDegreesOfFreedom(system);
 
 	/* Compute explicit grid forces */
-	computeGridForces(system, parameters);
+	// computeGridForces(system, parameters);
 
 	/* Grid velocity update */
 	updateGridVelocities(system, parameters.timestep);
@@ -37,29 +38,29 @@ void SerialSolver::simulateOneTick(System& system, const SimParameters parameter
 
 void SerialSolver::resetGrid(System& system)
 {
-	// Concurrency note: writes node + link
+	// Concurrency note: write system + node + link
+
+	system.activeNodes_ = 0;
 
 	for (Node& node : system.nodes_) {
 		node.mass = 0.0;
 		node.momentum.setZero();
 		node.velocity.setZero();
+		node.force.setZero();
+		node.active = false;
 	}
 
 	// TODO optimize this for performance
-	system.linksByNode.clear();
-	system.linksByParticle.clear();
+	system.linksByNode_.clear();
+	system.linksByParticle_.clear();
 
-	for(int ni = 0; ni < system.nodes_.size(); ni++)
-	{
-		system.linksByNode.emplace_back(std::vector<ParticleNodeLink>());
+	for (int ni = 0; ni < system.nodes_.size(); ni++) {
+		system.linksByNode_.emplace_back(std::vector<ParticleNodeLink>());
 	}
 
-	for(int pi = 0; pi < system.particles_.size(); pi++)
-	{
-		system.linksByParticle.emplace_back(std::vector<ParticleNodeLink*>());
+	for (int pi = 0; pi < system.particles_.size(); pi++) {
+		system.linksByParticle_.emplace_back(std::vector<ParticleNodeLink*>());
 	}
-	
-	
 }
 
 void SerialSolver::computeParticleNodeLinks(System& system)
@@ -94,7 +95,12 @@ void SerialSolver::computeParticleNodeLinks(System& system)
 			double gradZ = bSplineQuadraticSlope(distZ);
 
 			// compute weight N_ip (eq. 121)
-			double weight = weightX * weightX * weightZ; // eq. 121
+			double weight = weightX * weightY * weightZ;
+
+			// if weight is 0, skip this link
+			if (weight == 0) {
+				continue;
+			}
 
 			// compute weight gradient ∇N_ip(eq. after 124)
 			Vector3d weightGrad = Vector3d(gradX * weightY * weightZ,
@@ -106,12 +112,28 @@ void SerialSolver::computeParticleNodeLinks(System& system)
 			// Not needed for quadratic or cubic interpolations (paragraph after eq. 176)
 
 			// store on node list
-			int li = system.linksByNode[node->gridIndex].size();
-			system.linksByNode[node->gridIndex].emplace_back(ParticleNodeLink(&particle, node, weight, weightGrad));
+			int li = system.linksByNode_[node->gridIndex].size();
+			system.linksByNode_[node->gridIndex].emplace_back(ParticleNodeLink(&particle, node, weight, weightGrad));
 
 			// add particle to particle list
-			ParticleNodeLink* link = &system.linksByNode[node->gridIndex].at(li);
-			system.linksByParticle[pi].push_back(link);
+			ParticleNodeLink* link = &system.linksByNode_[node->gridIndex].at(li);
+			system.linksByParticle_[pi].push_back(link);
+		}
+	}
+}
+
+void SerialSolver::identifyDegreesOfFreedom(System& system)
+{
+	// Concurrency note: write system + node
+
+	// loop through node
+	for (int ni = 0; ni < system.nodes_.size(); ni++) {
+		Node& node = system.nodes_[ni];
+
+		// node.active = !system.linksByNode_[ni].empty();
+		if (node.mass > 0) {
+			node.active = true;
+			system.activeNodes_++;
 		}
 	}
 }
@@ -128,12 +150,12 @@ void SerialSolver::transferParticleToGrid(System& system, const float timestep)
 		Node& node = system.nodes_[ni];
 
 		// skip if node has no particle links
-		if (system.linksByNode[ni].empty()) {
+		if (system.linksByNode_[ni].empty()) {
 			continue;
 		}
 
 		// loop through node's links
-		for (const ParticleNodeLink& link : system.linksByNode[ni]) {
+		for (const ParticleNodeLink& link : system.linksByNode_[ni]) {
 			// convienience/readability
 			const Particle& particle = *link.particle;
 
@@ -146,6 +168,8 @@ void SerialSolver::transferParticleToGrid(System& system, const float timestep)
 
 		// compute velocity
 		node.velocity = node.momentum / node.mass;
+
+		assert(node.velocity.x() > 0);
 	}
 }
 
@@ -173,13 +197,13 @@ void SerialSolver::computeGridForces(System& system, const SimParameters& parame
 	for (int ni = 0; ni < system.nodes_.size(); ni++) {
 		Node& node = system.nodes_[ni];
 
-		// skip if node has no particle links
-		if (system.linksByNode[ni].empty()) {
+		// skip inactive nodes
+		if (!node.active) {
 			continue;
 		}
 
 		// loop through node's links
-		for (const ParticleNodeLink& link : system.linksByNode[ni]) {
+		for (const ParticleNodeLink& link : system.linksByNode_[ni]) {
 			// convienience/readability
 			const Particle& particle = *link.particle;
 
@@ -196,8 +220,15 @@ void SerialSolver::updateGridVelocities(System& system, const float timestep)
 	// Concurrency note: writes node
 
 	for (Node& node : system.nodes_) {
+		// skip inactive nodes
+		if (!node.active) {
+			continue;
+		}
+
 		// symplectic euler update (eq 183)
 		node.velocity = node.velocity + timestep * node.force / node.mass;
+
+		assert(!node.velocity.hasNaN());
 	}
 }
 
@@ -218,7 +249,7 @@ void SerialSolver::transferGridToParticle(System& system, const float timestep)
 		Matrix3d deformUpdate = Matrix3d::Zero();
 
 		// loop through particle's links
-		for (ParticleNodeLink* link : system.linksByParticle[pi]) {
+		for (ParticleNodeLink* link : system.linksByParticle_[pi]) {
 			// convienience/readability
 			const Node& node = *link->node;
 
@@ -227,6 +258,8 @@ void SerialSolver::transferGridToParticle(System& system, const float timestep)
 
 			// accumulate velocity v_i (eq 175)
 			particle.velocity += link->weight * node.velocity;
+
+			assert(!particle.velocity.hasNaN());
 
 			// acculumate affine state B_i (eq 176)
 			particle.affineState += link->weight * node.velocity * (node.position - particle.position).transpose();
@@ -243,8 +276,7 @@ void SerialSolver::advectParticle(System& system, const float timestep)
 {
 	// Concurrency note: writes particle
 
-	for(Particle& particle : system.particles_)
-	{
+	for (Particle& particle : system.particles_) {
 		particle.position += timestep * particle.velocity;
 	}
 }
