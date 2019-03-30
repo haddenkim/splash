@@ -24,7 +24,7 @@ void SerialSolver::simulateOneTick(System& system, const SimParameters parameter
 	identifyDegreesOfFreedom(system);
 
 	/* Compute explicit grid forces */
-	// computeGridForces(system, parameters);
+	computeGridForces(system, parameters);
 
 	/* Grid velocity update */
 	updateGridVelocities(system, parameters.timestep);
@@ -212,6 +212,9 @@ void SerialSolver::computeGridForces(System& system, const SimParameters& parame
 		}
 
 		// TODO: implement external force (ex. gravity)
+		if (parameters.gravityEnabled) {
+			node.force[1] -= parameters.gravityG * node.mass;
+		}
 	}
 }
 
