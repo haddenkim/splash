@@ -1,0 +1,13 @@
+[ ] 1.  Explicit Solver
+[x] 1.1     Particle to Grid Transfer
+[x] 1.2     Grid Velocities
+[ ] 1.3     Grid DoFs
+[ ] 1.4     Explicit Grid Forces
+[ ] 1.4.1       Internal Forces
+[ ] 1.4.2       External Forces
+[x] 1.5     Grid Velocity Update
+[ ] 1.5.1       Boundary Conditions
+[ ] 1.5.2       Collision
+[ ] 1.6     Particle Deformation Gradient
+[ ] 1.7     Grid to Particle Transfer
+[ ] 1.8     Particle Advection
