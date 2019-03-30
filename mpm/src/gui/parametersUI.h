@@ -9,5 +9,5 @@ public:
 	void draw();
 
 private:
-	SimParameters& m_simParameters;
+	SimParameters& simParameters_;
 };

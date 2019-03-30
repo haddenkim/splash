@@ -22,8 +22,6 @@ void UI::draw()
 		ImGui::MenuItem("System", NULL, &showSystem_);
 	}
 
-	ImGui::Separator();
-
 	if (showParameters_) {
 		parametersUI_.draw();
 	}

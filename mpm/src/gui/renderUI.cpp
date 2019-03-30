@@ -8,6 +8,9 @@ RenderUI::RenderUI(RenderSettings& renderSettings)
 
 void RenderUI::draw()
 {
+	ImGui::Separator();
+	ImGui::NewLine();
+
 	ImGui::SliderFloat("Point Size", &renderSettings_.pointSize, 0.1f, 20.0f);
 	ImGui::SliderFloat("Line Width", &renderSettings_.lineWidth, 0.1f, 10.0f);
 

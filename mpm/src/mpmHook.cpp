@@ -9,7 +9,8 @@ using namespace Eigen;
 
 MpmHook::MpmHook()
 	: PhysicsHook()
-	, system_(Vector3d(0.5, 0.5, 0.5), Vector3d(4, 4, 4))
+	, system_(Vector3d(0.5, 0.5, 0.5), // cell size
+			  Vector3d(4, 4, 4))	   // world size
 	, ui_(renderSettings_, simParameters_, system_, stats_)
 {
 	solver_ = new SerialSolver();
@@ -31,7 +32,9 @@ void MpmHook::initSimulation()
 	double partMass = 1.0;
 	double partVol  = 1.0;
 
-	system_.addParticle(partMass, partVol, 1.2, 1.2, 1.2, 0.1, 0, 0);
+	system_.addParticle(partMass, partVol, 1.2, 1.2, 1.2, 1, 0, 0);
+	system_.addParticle(partMass, partVol, 1.2, 1.4, 1.2, 1, 0, 0);
+
 	// system_.addParticle(partMass, partVol, 0.00, 0.75, 0, 0.1, 0, 0);
 	// system_.addParticle(partMass, partVol, 0.25, 1.25, 0, 0.1, 0, 0);
 	// system_.addParticle(partMass, partVol, 2.75, 2.75, 0, 0.1, 0, 0);
@@ -133,8 +136,8 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 
 	// grid
 	if (renderSettings_.showGrid) {
-		const RowVector3d black(0, 0, 0);
-		viewer.data().add_points(gridInactivePositions_, black);
+		const RowVector3d grey(0.5, 0.5, 0.5);
+		viewer.data().add_points(gridInactivePositions_, grey);
 	}
 	if (renderSettings_.showActiveGrid || renderSettings_.showGrid) {
 		viewer.data().add_points(gridActivePositions_, gridActiveColors_);

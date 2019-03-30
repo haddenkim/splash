@@ -89,11 +89,6 @@ void SerialSolver::computeParticleNodeLinks(System& system)
 			double weightY = bSplineQuadratic(distY);
 			double weightZ = bSplineQuadratic(distZ);
 
-			// compute weight gradient components ∇w_aip
-			double gradX = bSplineQuadraticSlope(distX);
-			double gradY = bSplineQuadraticSlope(distY);
-			double gradZ = bSplineQuadraticSlope(distZ);
-
 			// compute weight N_ip (eq. 121)
 			double weight = weightX * weightY * weightZ;
 
@@ -102,7 +97,12 @@ void SerialSolver::computeParticleNodeLinks(System& system)
 				continue;
 			}
 
-			// compute weight gradient ∇N_ip(eq. after 124)
+			// compute weight gradient components ∇w_aip
+			double gradX = bSplineQuadraticSlope(distX);
+			double gradY = bSplineQuadraticSlope(distY);
+			double gradZ = bSplineQuadraticSlope(distZ);
+
+			// compute weight gradient ∇N_ip (eq. after 124)
 			Vector3d weightGrad = Vector3d(gradX * weightY * weightZ,
 										   weightX * gradY * weightZ,
 										   weightX * weightY * gradZ)
@@ -168,8 +168,6 @@ void SerialSolver::transferParticleToGrid(System& system, const float timestep)
 
 		// compute velocity
 		node.velocity = node.momentum / node.mass;
-
-		assert(node.velocity.x() > 0);
 	}
 }
 
