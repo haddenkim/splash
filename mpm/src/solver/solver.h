@@ -2,6 +2,7 @@
 
 #include "settings/simParameters.h"
 #include "solver/solverStep.h"
+#include "state/stats.h"
 #include "state/system.h"
 
 class Solver {
@@ -16,7 +17,7 @@ public:
 	}
 
 	// note: copy simParameters to keep thread-safe
-	virtual void simulateOneTick(System& system, const SimParameters parameters) = 0;
+	virtual void simulateOneTick(System& system, Stats& stats, const SimParameters parameters) = 0;
 
 	// for debugging
 	virtual void advanceToStep(SolverStep targetStep, System& system, const SimParameters parameters) = 0;

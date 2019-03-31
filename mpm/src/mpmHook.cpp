@@ -55,10 +55,7 @@ void MpmHook::tick()
 bool MpmHook::simulateOneStep()
 {
 
-	solver_->simulateOneTick(system_, simParameters_);
-
-	// update stats
-	stats_.simTime += simParameters_.timestep;
+	solver_->simulateOneTick(system_, stats_, simParameters_);
 
 	return false;
 }

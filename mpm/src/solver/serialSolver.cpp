@@ -9,36 +9,36 @@ SerialSolver::SerialSolver()
 {
 }
 
-void SerialSolver::simulateOneTick(System& system, const SimParameters parameters)
+void SerialSolver::simulateOneTick(System& system, Stats& stats, const SimParameters parameters)
 {
-	if (currentStep == SolverStep::SOL_COMPLETE) {
-		/* Reset grid */
-		resetGrid(system);
+	assert(currentStep == SolverStep::SOL_COMPLETE);
 
-		/* Particle to grid links, weights and weight gradients */
-		computeParticleNodeLinks(system);
+	/* Reset grid */
+	resetGrid(system);
 
-		/* Particle to grid transfer (P2G) */
-		transferParticleToGrid(system, parameters.timestep);
+	/* Particle to grid links, weights and weight gradients */
+	computeParticleNodeLinks(system);
 
-		/* Identify grid degrees of freedom */
-		identifyDegreesOfFreedom(system);
+	/* Particle to grid transfer (P2G) */
+	transferParticleToGrid(system, parameters.timestep);
 
-		/* Compute explicit grid forces */
-		computeGridForces(system, parameters);
+	/* Identify grid degrees of freedom */
+	identifyDegreesOfFreedom(system);
 
-		/* Grid velocity update */
-		updateGridVelocities(system, parameters.timestep);
+	/* Compute explicit grid forces */
+	computeGridForces(system, parameters);
 
-		/* Grid to particle transfer (G2P) + Update particle deformation gradient */
-		transferGridToParticle(system, parameters.timestep);
+	/* Grid velocity update */
+	updateGridVelocities(system, parameters.timestep);
 
-		/* Particle advection */
-		advectParticle(system, parameters.timestep);
+	/* Grid to particle transfer (G2P) + Update particle deformation gradient */
+	transferGridToParticle(system, parameters.timestep);
 
-	} else {
-		advanceToStep(SolverStep::SOL_COMPLETE, system, parameters);
-	}
+	/* Particle advection */
+	advectParticle(system, parameters.timestep);
+
+	// log stats
+	stats.simTime += parameters.timestep;
 }
 
 void SerialSolver::advanceToStep(SolverStep targetStep, System& system, const SimParameters parameters)

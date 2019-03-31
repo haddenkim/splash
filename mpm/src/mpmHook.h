@@ -3,8 +3,8 @@
 #include "gui/ui.h"
 #include "settings/renderSettings.h"
 #include "settings/simParameters.h"
+#include "state/stats.h"
 #include "state/system.h"
-#include "stats.h"
 
 class Solver;
 
