@@ -4,16 +4,16 @@
 #include "state/particle.h"
 
 struct ParticleNodeLink {
-	ParticleNodeLink(Particle* particle, Node* node, double weight, Eigen::Vector3d weightGradient)
-		: particle(particle)
-		, node(node)
+	ParticleNodeLink(int particleIndex, int nodeIndex, double weight, Eigen::Vector3d weightGradient)
+		: particleIndex(particleIndex)
+		, nodeIndex(nodeIndex)
 		, weight(weight)
 		, weightGradient(weightGradient)
 	{
 	}
 
-	Particle*		particle;
-	Node*			node;
+	int				particleIndex;
+	int				nodeIndex;
 	double			weight;
 	Eigen::Vector3d weightGradient;
 };

@@ -20,11 +20,12 @@ public:
 
 	// grid z > y > x
 	std::vector<Node> nodes_;
-	int activeNodes_;
+	int				  activeNodes_;
 
 	// particle grid links
-	std::vector<std::vector<ParticleNodeLink>>  linksByNode_;	 // list of each Node's particle links. order matching node list
-	std::vector<std::vector<ParticleNodeLink*>> linksByParticle_; // list of each particle's links. order matching particle list
+	// TODO: find alternative data structure for 2 way (node + particle) iterators
+	std::vector<std::vector<ParticleNodeLink>> linksByNode_;	 // list of each Node's particle links. order matching node list
+	std::vector<std::vector<ParticleNodeLink>> linksByParticle_; // list of each particle's links. order matching particle list
 
 	// dimensions
 	Eigen::Vector3d worldOrigin_; // origin in world frame

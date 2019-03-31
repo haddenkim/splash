@@ -9,31 +9,89 @@ SerialSolver::SerialSolver()
 {
 }
 
-void SerialSolver::simulateOneTick(System& system, const SimParameters parameters) const
+void SerialSolver::simulateOneTick(System& system, const SimParameters parameters)
 {
-	/* Reset grid */
-	resetGrid(system);
+	if (currentStep == SolverStep::SOL_COMPLETE) {
+		/* Reset grid */
+		resetGrid(system);
 
-	/* Particle to grid links, weights and weight gradients */
-	computeParticleNodeLinks(system);
+		/* Particle to grid links, weights and weight gradients */
+		computeParticleNodeLinks(system);
 
-	/* Particle to grid transfer (P2G) */
-	transferParticleToGrid(system, parameters.timestep);
+		/* Particle to grid transfer (P2G) */
+		transferParticleToGrid(system, parameters.timestep);
 
-	/* Identify grid degrees of freedom */
-	identifyDegreesOfFreedom(system);
+		/* Identify grid degrees of freedom */
+		identifyDegreesOfFreedom(system);
 
-	/* Compute explicit grid forces */
-	computeGridForces(system, parameters);
+		/* Compute explicit grid forces */
+		computeGridForces(system, parameters);
 
-	/* Grid velocity update */
-	updateGridVelocities(system, parameters.timestep);
+		/* Grid velocity update */
+		updateGridVelocities(system, parameters.timestep);
 
-	/* Grid to particle transfer (G2P) + Update particle deformation gradient */
-	transferGridToParticle(system, parameters.timestep);
+		/* Grid to particle transfer (G2P) + Update particle deformation gradient */
+		transferGridToParticle(system, parameters.timestep);
 
-	/* Particle advection */
-	advectParticle(system, parameters.timestep);
+		/* Particle advection */
+		advectParticle(system, parameters.timestep);
+
+	} else {
+		advanceToStep(SolverStep::SOL_COMPLETE, system, parameters);
+	}
+}
+
+void SerialSolver::advanceToStep(SolverStep targetStep, System& system, const SimParameters parameters)
+{
+	if (targetStep > currentStep || currentStep == SolverStep::SOL_COMPLETE) {
+
+		// progress until target step
+		while (currentStep != targetStep) {
+			advance(currentStep);
+
+			switch (currentStep) {
+			case SolverStep::SOL_RESET:
+				resetGrid(system);
+				break;
+
+			case SolverStep::SOL_LINKS:
+				computeParticleNodeLinks(system);
+				break;
+
+			case SolverStep::SOL_P2G:
+				transferParticleToGrid(system, parameters.timestep);
+				break;
+
+			case SolverStep::SOL_DOF:
+				identifyDegreesOfFreedom(system);
+				break;
+
+			case SolverStep::SOL_FORCE:
+				computeGridForces(system, parameters);
+				break;
+
+			case SolverStep::SOL_VEL:
+				updateGridVelocities(system, parameters.timestep);
+				break;
+
+			case SolverStep::SOL_G2P:
+				transferGridToParticle(system, parameters.timestep);
+				break;
+
+			case SolverStep::SOL_ADVECT:
+				advectParticle(system, parameters.timestep);
+				break;
+			case SolverStep::SOL_COMPLETE:
+				break;
+
+			default:
+				break;
+			}
+		}
+	} else {
+		// TODO: consider advancing to the next step's target step
+		assert(!"Attempting to step backwards.");
+	}
 }
 
 void SerialSolver::resetGrid(System& system)
@@ -59,7 +117,7 @@ void SerialSolver::resetGrid(System& system)
 	}
 
 	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		system.linksByParticle_.emplace_back(std::vector<ParticleNodeLink*>());
+		system.linksByParticle_.emplace_back(std::vector<ParticleNodeLink>());
 	}
 }
 
@@ -75,6 +133,8 @@ void SerialSolver::computeParticleNodeLinks(System& system)
 
 		// loop through subset
 		for (Node* node : kernelNodes) {
+			assert(node);
+
 			// vector from node to particle in grid frame
 			Vector3d vecIP = (particle.position - node->position).cwiseQuotient(system.cellSize_);
 
@@ -111,13 +171,13 @@ void SerialSolver::computeParticleNodeLinks(System& system)
 			// accumulate inertia-like tensor D_p (eq. 174)
 			// Not needed for quadratic or cubic interpolations (paragraph after eq. 176)
 
-			// store on node list
-			int li = system.linksByNode_[node->gridIndex].size();
-			system.linksByNode_[node->gridIndex].emplace_back(ParticleNodeLink(&particle, node, weight, weightGrad));
+			// TODO: find alternative data structure for 2 way (node + particle) iterators
+			// perhaps a sparse matrix and interate rows for nodes, columns for particles
+			// add to node list
+			system.linksByNode_[node->gridIndex].emplace_back(ParticleNodeLink(pi, node->gridIndex, weight, weightGrad));
 
-			// add particle to particle list
-			ParticleNodeLink* link = &system.linksByNode_[node->gridIndex].at(li);
-			system.linksByParticle_[pi].push_back(link);
+			// add to particle list
+			system.linksByParticle_[pi].push_back(ParticleNodeLink(pi, node->gridIndex, weight, weightGrad));
 		}
 	}
 }
@@ -157,7 +217,7 @@ void SerialSolver::transferParticleToGrid(System& system, const float timestep)
 		// loop through node's links
 		for (const ParticleNodeLink& link : system.linksByNode_[ni]) {
 			// convienience/readability
-			const Particle& particle = *link.particle;
+			const Particle& particle = system.particles_[link.particleIndex];
 
 			// accumulate mass (eq. 172)
 			node.mass += link.weight * particle.mass;
@@ -203,7 +263,7 @@ void SerialSolver::computeGridForces(System& system, const SimParameters& parame
 		// loop through node's links
 		for (const ParticleNodeLink& link : system.linksByNode_[ni]) {
 			// convienience/readability
-			const Particle& particle = *link.particle;
+			const Particle& particle = system.particles_[link.particleIndex];
 
 			// internal stress force f_i (eq 189)
 			node.force -= particle.nodalForceContribution * link.weightGradient;
@@ -230,6 +290,13 @@ void SerialSolver::updateGridVelocities(System& system, const float timestep)
 		node.velocity = node.velocity + timestep * node.force / node.mass;
 
 		assert(!node.velocity.hasNaN());
+
+		// TODO: boundary conditions + collisions
+
+		// temp: floor boundary at y = 1
+		if (node.position.y() < 1) {
+			node.velocity[1] = std::max(node.velocity.y(), 0.0);
+		}
 	}
 }
 
@@ -250,20 +317,21 @@ void SerialSolver::transferGridToParticle(System& system, const float timestep)
 		Matrix3d deformUpdate = Matrix3d::Zero();
 
 		// loop through particle's links
-		for (ParticleNodeLink* link : system.linksByParticle_[pi]) {
+		for (const ParticleNodeLink& link : system.linksByParticle_[pi]) {
+
 			// convienience/readability
-			const Node& node = *link->node;
+			const Node& node = system.nodes_[link.nodeIndex];
 
 			// accumulate node's deformation update
-			deformUpdate += node.velocity * link->weightGradient.transpose();
+			deformUpdate += node.velocity * link.weightGradient.transpose();
 
 			// accumulate velocity v_i (eq 175)
-			particle.velocity += link->weight * node.velocity;
+			particle.velocity += link.weight * node.velocity;
 
 			assert(!particle.velocity.hasNaN());
 
 			// acculumate affine state B_i (eq 176)
-			particle.affineState += link->weight * node.velocity * (node.position - particle.position).transpose();
+			particle.affineState += link.weight * node.velocity * (node.position - particle.position).transpose();
 		}
 
 		// update deformation gradient F_p (eq 181)

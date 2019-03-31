@@ -8,7 +8,9 @@ public:
 	SerialSolver();
 
 	// note: intentionally copying SimParameters to guard against modifications (from GUI thread)
-	void simulateOneTick(System& system, const SimParameters parameters) const override;
+	void simulateOneTick(System& system, const SimParameters parameters) override;
+
+	void advanceToStep(SolverStep step, System& system, const SimParameters parameters) override;
 
 private:
 	/* core mpm steps */

@@ -10,10 +10,10 @@ using namespace Eigen;
 MpmHook::MpmHook()
 	: PhysicsHook()
 	, system_(Vector3d(0.5, 0.5, 0.5), // cell size
-			  Vector3d(4, 4, 4))	   // world size
-	, ui_(renderSettings_, simParameters_, system_, stats_)
+			  Vector3d(10, 10, 10))	// world size
+	, solver_(new SerialSolver)
+	, ui_(solver_, renderSettings_, simParameters_, system_, stats_)
 {
-	solver_ = new SerialSolver();
 }
 
 void MpmHook::drawGUI()
@@ -32,12 +32,17 @@ void MpmHook::initSimulation()
 	double partMass = 1.0;
 	double partVol  = 1.0;
 
-	system_.addParticle(partMass, partVol, 1.2, 1.2, 1.2, 1, 0, 0);
-	system_.addParticle(partMass, partVol, 1.2, 1.4, 1.2, 1, 0, 0);
+	// system_.addParticle(partMass, partVol, 1.2, 8.2, 1.2, 1, 0, 0);
+	// system_.addParticle(partMass, partVol, 1.0, 8.4, 1.2, 1, 0, 0);
 
-	// system_.addParticle(partMass, partVol, 0.00, 0.75, 0, 0.1, 0, 0);
-	// system_.addParticle(partMass, partVol, 0.25, 1.25, 0, 0.1, 0, 0);
-	// system_.addParticle(partMass, partVol, 2.75, 2.75, 0, 0.1, 0, 0);
+	// cube
+	for (double z = 4; z <= 6; z += 0.2) {
+		for (double y = 7; y <= 9; y += 0.2) {
+			for (double x = 4; x < 6; x+= 0.2) {
+				system_.addParticle(partMass, partVol, x, y, z, 0, 0, 0);
+			}
+		}
+	}
 
 	// reset stats
 	stats_.simTime = 0.f;
