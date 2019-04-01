@@ -13,13 +13,12 @@ System::System(Eigen::Vector3d cellSize, Eigen::Vector3d worldSize)
 	computeKernelSize();
 }
 
-void System::addParticle(double m, double vol, double x, double y, double z, double vx, double vy, double vz)
+void System::addParticle(double m, double vol, Eigen::Vector3d position, Eigen::Vector3d velocity)
 {
-	particles_.emplace_back(Particle(m,					   // mass
-									 vol,				   // volume
-									 Vector3d(x, y, z),	// position
-									 Vector3d(vx, vy, vz)) // velocity
-	);
+	particles_.emplace_back(Particle(m,
+									 vol,
+									 position,
+									 velocity));
 }
 
 void System::clearParticles()

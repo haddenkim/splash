@@ -10,7 +10,7 @@ class System {
 public:
 	System(Eigen::Vector3d cellSize, Eigen::Vector3d worldSize);
 
-	void addParticle(double m, double vol, double x, double y, double z, double vx, double vy, double vz);
+	void addParticle(double m, double vol, Eigen::Vector3d position, Eigen::Vector3d  velocity);
 	void clearParticles();
 
 	Node* getNodeAt(int x, int y, int z);

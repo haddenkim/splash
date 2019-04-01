@@ -9,8 +9,8 @@ using namespace Eigen;
 
 MpmHook::MpmHook()
 	: PhysicsHook()
-	, system_(Vector3d(0.5, 0.5, 0.5), // cell size
-			  Vector3d(10, 10, 10))	// world size
+	, system_(Vector3d(0.1, 0.1, 0.1), // cell size
+			  Vector3d(20, 10, 20))	// world size
 	, solver_(new SerialSolver)
 	, ui_(solver_, renderSettings_, simParameters_, system_, stats_)
 {
@@ -36,12 +36,21 @@ void MpmHook::initSimulation()
 	// system_.addParticle(partMass, partVol, 1.0, 8.4, 1.2, 1, 0, 0);
 
 	// cube
-	for (double z = 4; z <= 6; z += 0.2) {
-		for (double y = 7; y <= 9; y += 0.2) {
-			for (double x = 4; x < 6; x+= 0.2) {
-				system_.addParticle(partMass, partVol, x, y, z, 0, 0, 0);
-			}
-		}
+	Vector3d center(5, 10, 5);
+	double   radius = 4.0;
+	Vector3d velocity(2, -2, 2);
+
+	for (int i = 0; i < 3000; i++) {
+		double x = ((double)std::rand()) / (double)RAND_MAX; // between 0 - 1
+		double y = ((double)std::rand()) / (double)RAND_MAX;
+		double z = ((double)std::rand()) / (double)RAND_MAX;
+
+		// position
+		Vector3d position(x, y, z);
+		position *= radius * 2;				   // scale
+		position += center - Vector3d(radius); // translate
+
+		system_.addParticle(partMass, partVol, position, velocity);
 	}
 
 	// reset stats
@@ -108,10 +117,10 @@ void MpmHook::updateRenderGeometry()
 	// floor
 	{
 		meshV_.resize(4, 3);
-		meshV_ << 0, 0, 0,
-			10, 0, 0,
-			0, 0, 10,
-			10, 0, 10;
+		meshV_ << 0, 1, 0,
+			20, 1, 0,
+			0, 1, 20,
+			20, 1, 20;
 
 		meshF_.resize(2, 3);
 		meshF_ << 0, 3, 1,
