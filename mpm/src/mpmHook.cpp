@@ -9,8 +9,8 @@ using namespace Eigen;
 
 MpmHook::MpmHook()
 	: PhysicsHook()
-	, system_(Vector3d(0.1, 0.1, 0.1), // cell size
-			  Vector3d(20, 10, 20))	// world size
+	, system_(0.1,					// cell size
+			  Vector3d(20, 10, 20)) // world size
 	, solver_(new SerialSolver)
 	, ui_(solver_, renderSettings_, simParameters_, system_, stats_)
 {
@@ -40,7 +40,7 @@ void MpmHook::initSimulation()
 	double   radius = 4.0;
 	Vector3d velocity(2, -2, 2);
 
-	for (int i = 0; i < 3000; i++) {
+	for (int i = 0; i < 100; i++) {
 		double x = ((double)std::rand()) / (double)RAND_MAX; // between 0 - 1
 		double y = ((double)std::rand()) / (double)RAND_MAX;
 		double z = ((double)std::rand()) / (double)RAND_MAX;

@@ -8,9 +8,9 @@
 
 class System {
 public:
-	System(Eigen::Vector3d cellSize, Eigen::Vector3d worldSize);
+	System(double cellSize, Eigen::Vector3d worldSize);
 
-	void addParticle(double m, double vol, Eigen::Vector3d position, Eigen::Vector3d  velocity);
+	void addParticle(double m, double vol, Eigen::Vector3d position, Eigen::Vector3d velocity);
 	void clearParticles();
 
 	Node* getNodeAt(int x, int y, int z);
@@ -28,8 +28,9 @@ public:
 	std::vector<std::vector<ParticleNodeLink>> linksByParticle_; // list of each particle's links. order matching particle list
 
 	// dimensions
+	double			cellSize_;	 // uniform size of individual cell (node to node spacing) in world frame
 	Eigen::Vector3d worldOrigin_; // origin in world frame
-	Eigen::Vector3d cellSize_;	// size of an individual cell (node to node spacing) in world frame
+	// Eigen::Vector3d cellSize_;	// size of an individual cell (node to node spacing) in world frame
 	Eigen::Vector3i gridSize_;	// number of nodes in grid
 	Eigen::Vector3d worldSize_;   // size of grid in world frame
 

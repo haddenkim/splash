@@ -136,7 +136,7 @@ void SerialSolver::computeParticleNodeLinks(System& system)
 			assert(node);
 
 			// vector from node to particle in grid frame
-			Vector3d vecIP = (particle.position - node->position).cwiseQuotient(system.cellSize_);
+			Vector3d vecIP = (particle.position - node->position) / system.cellSize_;
 
 			// compute distance components
 			double distX = vecIP.x();
@@ -165,8 +165,7 @@ void SerialSolver::computeParticleNodeLinks(System& system)
 			// compute weight gradient ∇N_ip (eq. after 124)
 			Vector3d weightGrad = Vector3d(gradX * weightY * weightZ,
 										   weightX * gradY * weightZ,
-										   weightX * weightY * gradZ)
-									  .cwiseQuotient(system.cellSize_);
+										   weightX * weightY * gradZ) / system.cellSize_;
 
 			// accumulate inertia-like tensor D_p (eq. 174)
 			// Not needed for quadratic or cubic interpolations (paragraph after eq. 176)
@@ -203,7 +202,7 @@ void SerialSolver::transferParticleToGrid(System& system, const float timestep)
 	// Concurrency note: read particle + link, write node
 
 	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-	Matrix3d commonDInverse = 4.0 * system.cellSize_.cwiseProduct(system.cellSize_).asDiagonal().inverse(); // (1/4 * (∆x)^2 * I)^-1
+	double commonDInverseScalar = 0.25 / system.cellSize_ / system.cellSize_; // (1/4 * (∆x)^2 * I)^-1
 
 	// loop through node
 	for (int ni = 0; ni < system.nodes_.size(); ni++) {
@@ -223,7 +222,7 @@ void SerialSolver::transferParticleToGrid(System& system, const float timestep)
 			node.mass += link.weight * particle.mass;
 
 			// accumulate momentum (eq. 173)
-			node.momentum += link.weight * particle.mass * (particle.velocity + particle.affineState * commonDInverse * (node.position - particle.position));
+			node.momentum += link.weight * particle.mass * (particle.velocity + particle.affineState * commonDInverseScalar * (node.position - particle.position));
 		}
 
 		// compute velocity
@@ -360,7 +359,7 @@ void SerialSolver::transferGridToParticle(System& system, const float timestep)
 		particle.elasticDeterminant = particle.elasticGradient.determinant();
 
 		// udpate plastic deformation gradient F_P (eq 86) and its determinant
-		particle.plasticGradient = particle.elasticGradient.inverse() * deformationGradient;
+		particle.plasticGradient	= particle.elasticGradient.inverse() * deformationGradient;
 		particle.plasticDeterminant = particle.plasticGradient.determinant();
 
 		// update elastic rotation R_E (paragraph under eq 45)
@@ -384,7 +383,7 @@ std::vector<Node*> SerialSolver::getKernelNodes(const Eigen::Vector3d& position,
 	std::vector<Node*> ret;
 
 	// lowest node position in grid frame
-	Vector3i startNode = position.cwiseQuotient(system.cellSize_).cast<int>() - system.kernelOffset_;
+	Vector3i startNode = (position / system.cellSize_).cast<int>() - system.kernelOffset_;
 	// highest node position in grid frame
 	Vector3i endNode = startNode + system.kernelSize_;
 
