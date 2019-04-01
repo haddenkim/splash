@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-double bSplineQuadratic(double x) // eq 123
+double bSplineQuadratic(double x)
 {
 	double aX = std::fabs(x);
 

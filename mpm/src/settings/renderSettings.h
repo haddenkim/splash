@@ -4,7 +4,7 @@ struct RenderSettings {
 	RenderSettings()
 	{
 		// default settings
-		pointSize = 10.f;
+		pointSize = 3.f;
         lineWidth = 1.0f;
 
 		showParticles		 = true;

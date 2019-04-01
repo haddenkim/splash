@@ -4,7 +4,7 @@ struct SimParameters {
 	SimParameters()
 	{
 		// default settings
-		timestep = 0.01f;
+		timestep = 0.001f;
 
 		gravityEnabled = true;
 		gravityG	   = 9.8;

@@ -235,19 +235,25 @@ void SerialSolver::computeGridForces(System& system, const SimParameters& parame
 {
 	// Concurrency note: read link, writes particle + node
 
+	// compute internal forces
+	// Fixed Corotated Constitutive Model (sec 6.3)
+
 	// for convenience / optimization, pre-compute particle constant
 	for (Particle& particle : system.particles_) {
-		// compute deformation gradient inverse transpose F^(-T)
-		Matrix3d defGradInvTran = particle.deformationGradient.inverse().transpose();
 
-		// compute determinent of deformation gradient J
-		double J = particle.deformationGradient.determinant();
+		// compute current mu and lambda (eq 87)
+		double exp	= std::exp(particle.hardening * (1.0 - particle.plasticDeterminant));
+		double mu	 = particle.mu0 * exp;
+		double lambda = particle.lambda0 * exp;
 
-		// compute first Piola-Kirchoff Stresss P (eq 48)
-		Matrix3d pk1Stress = particle.mu * (particle.deformationGradient - defGradInvTran) + particle.lambda * log(J) * defGradInvTran;
+		// compute first Piola-Kirchoff Stresss P (eq 52)
+		Matrix3d pk1Stress = 2 * mu * (particle.elasticGradient - particle.elasticRotation)
+			+ lambda * (particle.elasticDeterminant - 1) * particle.elasticDeterminant * particle.elasticGradient.inverse().transpose();
 
 		// compute the per particle constant contribution to nodal elastic force V_p * P_p * (F_p)^T (eq 189)
-		particle.nodalForceContribution = particle.volume * pk1Stress * particle.deformationGradient.transpose();
+		particle.nodalForceContribution = particle.volume * pk1Stress * particle.elasticGradient.transpose();
+
+		assert(!particle.nodalForceContribution.hasNaN());
 	}
 
 	// compute node force
@@ -273,6 +279,8 @@ void SerialSolver::computeGridForces(System& system, const SimParameters& parame
 		if (parameters.gravityEnabled) {
 			node.force[1] -= parameters.gravityG * node.mass;
 		}
+
+		assert(!node.force.hasNaN());
 	}
 }
 
@@ -287,7 +295,7 @@ void SerialSolver::updateGridVelocities(System& system, const float timestep)
 		}
 
 		// symplectic euler update (eq 183)
-		node.velocity = node.velocity + timestep * node.force / node.mass;
+		node.velocity = node.velocity + timestep / node.mass * node.force;
 
 		assert(!node.velocity.hasNaN());
 
@@ -312,18 +320,16 @@ void SerialSolver::transferGridToParticle(System& system, const float timestep)
 		particle.velocity.setZero();
 		particle.affineState.setZero();
 
-		// TODO: find name for this
-		// holds Σ_i (eq 181)
-		Matrix3d deformUpdate = Matrix3d::Zero();
+		// hold accumulation of ∇v_p = Σ_i(v_i * ∇w_ip) (eq 181) (stomakhin step 7)
+		Matrix3d velocityGradient = Matrix3d::Zero();
 
 		// loop through particle's links
 		for (const ParticleNodeLink& link : system.linksByParticle_[pi]) {
-
 			// convienience/readability
 			const Node& node = system.nodes_[link.nodeIndex];
 
 			// accumulate node's deformation update
-			deformUpdate += node.velocity * link.weightGradient.transpose();
+			velocityGradient += node.velocity * link.weightGradient.transpose();
 
 			// accumulate velocity v_i (eq 175)
 			particle.velocity += link.weight * node.velocity;
@@ -334,8 +340,31 @@ void SerialSolver::transferGridToParticle(System& system, const float timestep)
 			particle.affineState += link.weight * node.velocity * (node.position - particle.position).transpose();
 		}
 
-		// update deformation gradient F_p (eq 181)
-		particle.deformationGradient = (Matrix3d::Identity() + timestep * deformUpdate) * particle.deformationGradient;
+		// compute updated deformation gradient F_E_Tilda (eq 181 and paragraph above eq 80)
+		particle.elasticGradient = (Matrix3d::Identity() + timestep * velocityGradient) * particle.elasticGradient;
+
+		// compute overall deformation gradient F (eq 80)
+		Matrix3d deformationGradient = particle.elasticGradient * particle.plasticGradient;
+
+		// SVD decomposition of F_E_Tilda (eq 83)
+		JacobiSVD<Matrix3d> svd(particle.elasticGradient, ComputeFullU | ComputeFullV);
+		Matrix3d			U	 = svd.matrixU();		  // U
+		Vector3d			Sigma = svd.singularValues(); // Σ
+		Matrix3d			V	 = svd.matrixV();		  // V
+
+		// clamp singular values (eq 82)
+		Sigma = Sigma.cwiseMax(1.0 - particle.criticalCompression).cwiseMin(1.0 + particle.criticalStretch);
+
+		// udpate elastic deformation gradient F_E (eq 84) and its determinant
+		particle.elasticGradient	= U * Sigma.asDiagonal() * V.transpose();
+		particle.elasticDeterminant = particle.elasticGradient.determinant();
+
+		// udpate plastic deformation gradient F_P (eq 86) and its determinant
+		particle.plasticGradient = particle.elasticGradient.inverse() * deformationGradient;
+		particle.plasticDeterminant = particle.plasticGradient.determinant();
+
+		// update elastic rotation R_E (paragraph under eq 45)
+		particle.elasticRotation = U * V.transpose();
 	}
 
 	// TODO: boundary conditions + collisions
