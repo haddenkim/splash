@@ -34,11 +34,6 @@ public:
 	Eigen::Vector3i gridSize_;	// number of nodes in grid
 	Eigen::Vector3d worldSize_;   // size of grid in world frame
 
-	double			kernelRadius_; // kernel radius in world frame
-	Eigen::Vector3i kernelSize_;   // size of kernel in grid frame
-	Eigen::Vector3i kernelOffset_; // maps particle position to smallest node in kernel
-
 private:
 	void initGrid();
-	void computeKernelSize();
 };

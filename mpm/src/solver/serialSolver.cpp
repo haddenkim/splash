@@ -165,7 +165,8 @@ void SerialSolver::computeParticleNodeLinks(System& system)
 			// compute weight gradient ∇N_ip (eq. after 124)
 			Vector3d weightGrad = Vector3d(gradX * weightY * weightZ,
 										   weightX * gradY * weightZ,
-										   weightX * weightY * gradZ) / system.cellSize_;
+										   weightX * weightY * gradZ)
+				/ system.cellSize_;
 
 			// accumulate inertia-like tensor D_p (eq. 174)
 			// Not needed for quadratic or cubic interpolations (paragraph after eq. 176)
@@ -382,10 +383,13 @@ std::vector<Node*> SerialSolver::getKernelNodes(const Eigen::Vector3d& position,
 {
 	std::vector<Node*> ret;
 
+	// TODO: investigate alternative interpolation kernels
+	// for now quadradic kernel (eq 123)
+
 	// lowest node position in grid frame
-	Vector3i startNode = (position / system.cellSize_).cast<int>() - system.kernelOffset_;
+	Vector3i startNode = (position / system.cellSize_ - Vector3d(0.5, 0.5, 0.5)).cast<int>();
 	// highest node position in grid frame
-	Vector3i endNode = startNode + system.kernelSize_;
+	Vector3i endNode = startNode + Vector3i(3, 3, 3);
 
 	// adjust start and end nodes if out of grid bounds
 	startNode = startNode.cwiseMax(0.0);

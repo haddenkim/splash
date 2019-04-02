@@ -1,16 +1,17 @@
 #include "mpmHook.h"
 
 #include "solver/serialSolver.h"
+#include "state/node.h"
+#include "state/particle.h"
+#include "state/systemShapes.h"
 #include <imgui/imgui.h>
-#include <state/node.h>
-#include <state/particle.h>
 
 using namespace Eigen;
 
 MpmHook::MpmHook()
 	: PhysicsHook()
-	, system_(0.1,					// cell size
-			  Vector3d(20, 10, 20)) // world size
+	, system_(0.5,				   // cell size
+			  Vector3d(20, 10, 5)) // world size
 	, solver_(new SerialSolver)
 	, ui_(solver_, renderSettings_, simParameters_, system_, stats_)
 {
@@ -29,29 +30,13 @@ void MpmHook::initSimulation()
 	// clear system particles
 	system_.clearParticles();
 
-	double partMass = 1.0;
-	double partVol  = 1.0;
-
-	// system_.addParticle(partMass, partVol, 1.2, 8.2, 1.2, 1, 0, 0);
-	// system_.addParticle(partMass, partVol, 1.0, 8.4, 1.2, 1, 0, 0);
-
 	// cube
-	Vector3d center(5, 10, 5);
-	double   radius = 4.0;
-	Vector3d velocity(2, -2, 2);
+	Vector3d center(2, 4, 2);
+	double   radius = 1.0;
+	Vector3d velocity(2, -2, 0);
+	int		 count = 100;
 
-	for (int i = 0; i < 100; i++) {
-		double x = ((double)std::rand()) / (double)RAND_MAX; // between 0 - 1
-		double y = ((double)std::rand()) / (double)RAND_MAX;
-		double z = ((double)std::rand()) / (double)RAND_MAX;
-
-		// position
-		Vector3d position(x, y, z);
-		position *= radius * 2;				   // scale
-		position += center - Vector3d(radius); // translate
-
-		system_.addParticle(partMass, partVol, position, velocity);
-	}
+	SystemShapes::addCube(system_, center, radius, velocity, count);
 
 	// reset stats
 	stats_.simTime = 0.f;
@@ -116,11 +101,14 @@ void MpmHook::updateRenderGeometry()
 
 	// floor
 	{
+		double endX = system_.worldSize_.x();
+		double endZ = system_.worldSize_.z();
+
 		meshV_.resize(4, 3);
 		meshV_ << 0, 1, 0,
-			20, 1, 0,
-			0, 1, 20,
-			20, 1, 20;
+			endX, 1, 0,
+			0, 1, endZ,
+			endX, 1, endZ;
 
 		meshF_.resize(2, 3);
 		meshF_ << 0, 3, 1,

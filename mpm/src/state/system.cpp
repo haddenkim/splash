@@ -10,7 +10,6 @@ System::System(double cellSize, Eigen::Vector3d worldSize)
 	, worldSize_(worldSize)
 {
 	initGrid();
-	computeKernelSize();
 }
 
 void System::addParticle(double m, double vol, Eigen::Vector3d position, Eigen::Vector3d velocity)
@@ -37,11 +36,6 @@ Node* System::getNodeAt(int x, int y, int z)
 
 void System::initGrid()
 {
-	// check grid size
-	assert(fmod(worldSize_.x(), cellSize_) == 0.0
-		   && fmod(worldSize_.y(), cellSize_) == 0.0
-		   && fmod(worldSize_.z(), cellSize_) == 0.0);
-
 	// integer grid size
 	gridSize_ = (worldSize_ / cellSize_).cast<int>() + Vector3i(1, 1, 1);
 
@@ -57,23 +51,4 @@ void System::initGrid()
 			}
 		}
 	}
-}
-
-void System::computeKernelSize()
-{
-	// TODO: investigate user-variable kernels
-	// for now, fix kernel world size to (2,2,2) (radius = 1)
-	kernelRadius_		  = 1.0;
-	double kernelDiameter = kernelRadius_ * 2.0;
-
-	// check size
-	assert(fmod(kernelDiameter, cellSize_) == 0.0
-		   && fmod(kernelDiameter, cellSize_) == 0.0
-		   && fmod(kernelDiameter, cellSize_) == 0.0);
-
-	// integer kernel size
-	kernelSize_ = (Vector3d(kernelDiameter, kernelDiameter, kernelDiameter) / cellSize_).cast<int>() + Vector3i(1, 1, 1);
-
-	// kernel offset
-	kernelOffset_ = kernelSize_ / 2;
 }
