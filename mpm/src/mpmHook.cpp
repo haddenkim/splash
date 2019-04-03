@@ -1,45 +1,88 @@
 #include "mpmHook.h"
-
 #include "solver/serialSolver.h"
-#include "state/node.h"
-#include "state/particle.h"
-#include "state/systemShapes.h"
-#include <imgui/imgui.h>
 
 using namespace Eigen;
 
 MpmHook::MpmHook()
 	: PhysicsHook()
-	, system_(0.5,				   // cell size
-			  Vector3d(20, 10, 5)) // world size
-	, solver_(new SerialSolver)
-	, ui_(solver_, renderSettings_, simParameters_, system_, stats_)
 {
+	// bounds
+	{ // x = L(eft) or R(ight)
+		// y = D(own) or U(p)
+		// z = B(ack) or F(ront)
+		RowVector3d LDB(0, 0, 0);
+		RowVector3d RDB(1, 0, 0);
+		RowVector3d LUB(0, 1, 0);
+		RowVector3d RUB(1, 1, 0);
+
+		RowVector3d LDF(0, 0, 1);
+		RowVector3d RDF(1, 0, 1);
+		RowVector3d LUF(0, 1, 1);
+		RowVector3d RUF(1, 1, 1);
+
+		gridBorders_.resize(12, 6); // 3 start , 3 end
+
+		// x edges
+		gridBorders_.row(0) << LDB, RDB;
+		gridBorders_.row(1) << LUB, RUB;
+		gridBorders_.row(2) << LDF, RDF;
+		gridBorders_.row(3) << LUF, RUF;
+
+		// y edges
+		gridBorders_.row(4) << LDB, LUB;
+		gridBorders_.row(5) << RDB, RUB;
+		gridBorders_.row(6) << LDF, LUF;
+		gridBorders_.row(7) << RDF, RUF;
+
+		// z edges
+		gridBorders_.row(8) << LDB, LDF;
+		gridBorders_.row(9) << RDB, RDF;
+		gridBorders_.row(10) << LUB, LUF;
+		gridBorders_.row(11) << RUB, RUF;
+	}
 }
 
 void MpmHook::drawGUI()
 {
-	ImGui::Separator();
-
-	// draw sub UIs
-	ui_.draw();
 }
 
 void MpmHook::initSimulation()
 {
-	// clear system particles
-	system_.clearParticles();
+	step = 0;
+	system_.clear();
 
-	// cube
-	Vector3d center(2, 4, 2);
-	double   radius = 1.0;
-	Vector3d velocity(2, -2, 0);
-	int		 count = 100;
+	// falling blocks
+	{
+		system_.addCube(Vector3d(0.55, 0.45, 0.5),
+						Vector3d(0, 0, 0),
+						RowVector3d(0, 0, 1));
 
-	SystemShapes::addCube(system_, center, radius, velocity, count);
+		system_.addCube(Vector3d(0.45, 0.65, 0.5),
+						Vector3d(0, 0, 0),
+						RowVector3d(1, 1, 0));
 
-	// reset stats
-	stats_.simTime = 0.f;
+		system_.addCube(Vector3d(0.55, 0.85, 0.6),
+						  Vector3d(0, 0, 0),
+						  RowVector3d(0, 1, 0));
+	}
+
+	// colliding blocks
+	// {
+	// 	system_.addCube(Vector3d(0.15, 0.8, 0.15),
+	// 					Vector3d(10, 0, 10),
+	// 					RowVector3d(0, 0, 1));
+
+	// 	system_.addCube(Vector3d(0.85, 0.7, 0.85),
+	// 					Vector3d(-10, 0, -10),
+	// 					RowVector3d(1, 1, 0));
+	// }
+
+	// // block to wall
+	// {
+	// 	system_.addCube(Vector3d(0.5, 0.7, 0.5),
+	// 					Vector3d(10, 0, 0),
+	// 					RowVector3d(1, 1, 0));
+	// }
 }
 
 void MpmHook::tick()
@@ -48,112 +91,55 @@ void MpmHook::tick()
 
 bool MpmHook::simulateOneStep()
 {
+	step++;
 
-	solver_->simulateOneTick(system_, stats_, simParameters_);
+	SerialSolver::advance(system_, simParameters_);
 
 	return false;
 }
 
 void MpmHook::updateRenderGeometry()
 {
+	// if (step % int(frame_dt / dt) == 0) {
+
 	// particles
 	{
 		int psize = system_.particles_.size();
 		particlePositions_.resize(psize, 3);
-		particleVelocities_.resize(psize, 3);
+		particleColors_.resize(psize, 3);
 
 		for (int i = 0; i < psize; i++) {
-			particlePositions_.block<1, 3>(i, 0)  = system_.particles_[i].position;
-			particleVelocities_.block<1, 3>(i, 0) = system_.particles_[i].velocity;
+			particlePositions_.block<1, 3>(i, 0) = system_.particles_[i].pos;
+			particleColors_.block<1, 3>(i, 0)	= system_.particles_[i].color;
 		}
 
-		particleColors_.resize(psize, 3);
-		particleColors_.setConstant(1.0);
+		// particlePositions_.resize(system_.partCount, 3);
+		// particleColors_.resize(system_.partCount, 3);
+
+		// particlePositions_ = system_.partPos;
+		// particleColors_	= system_.partColor;
 	}
-
-	// grid
-	{
-		int gsize = system_.nodes_.size();
-		gridActivePositions_.resize(system_.activeNodes_, 3);
-		gridVelocities_.resize(system_.activeNodes_, 3);
-		gridForces_.resize(system_.activeNodes_, 3);
-
-		gridInactivePositions_.resize(gsize - system_.activeNodes_, 3);
-
-		int activeNI   = 0;
-		int inactiveNI = 0;
-
-		for (const Node& node : system_.nodes_) {
-			if (node.active) {
-				gridActivePositions_.block<1, 3>(activeNI, 0) = node.position;
-				gridVelocities_.block<1, 3>(activeNI, 0)	  = node.velocity;
-				gridForces_.block<1, 3>(activeNI, 0)		  = node.force;
-				activeNI++;
-			} else {
-				gridInactivePositions_.block<1, 3>(inactiveNI, 0) = node.position;
-				inactiveNI++;
-			}
-		}
-
-		gridActiveColors_.resize(system_.activeNodes_, 3);
-		gridActiveColors_.setConstant(0.0);
-	}
-
-	// floor
-	{
-		double endX = system_.worldSize_.x();
-		double endZ = system_.worldSize_.z();
-
-		meshV_.resize(4, 3);
-		meshV_ << 0, 1, 0,
-			endX, 1, 0,
-			0, 1, endZ,
-			endX, 1, endZ;
-
-		meshF_.resize(2, 3);
-		meshF_ << 0, 3, 1,
-			0, 2, 3;
-	}
+	// }
 }
 
 void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 {
+	// if (step % int(frame_dt / dt) == 0) {
 
 	viewer.data().clear();
 
-	viewer.data().point_size = renderSettings_.pointSize;
-	viewer.data().line_width = renderSettings_.lineWidth;
+	viewer.data().point_size = 3.0;
 
 	// particles
-	if (renderSettings_.showParticles) {
-		viewer.data().add_points(particlePositions_, particleColors_);
-	}
-	if (renderSettings_.showParticleVelocity) {
-		const RowVector3d black(0, 0, 0);
-		viewer.data().add_edges(particlePositions_, particlePositions_ + particleVelocities_, black);
-	}
+	viewer.data().add_points(particlePositions_, particleColors_);
 
-	// grid
-	if (renderSettings_.showGrid) {
-		const RowVector3d grey(0.5, 0.5, 0.5);
-		viewer.data().add_points(gridInactivePositions_, grey);
-	}
-	if (renderSettings_.showActiveGrid || renderSettings_.showGrid) {
-		viewer.data().add_points(gridActivePositions_, gridActiveColors_);
-	}
-	if (renderSettings_.showGridVelocity) {
-		const RowVector3d black(0, 0, 0);
-		viewer.data().add_edges(gridActivePositions_, gridActivePositions_ + gridVelocities_, black);
-	}
-	if (renderSettings_.showGridForce) {
-		const RowVector3d red(1, 0, 0);
-		viewer.data().add_edges(gridActivePositions_, gridActivePositions_ + gridForces_, red);
-	}
+	// boundary
+	RowVector3d red(1, 0, 0);
+	MatrixXd	borderStart = gridBorders_.block<12, 3>(0, 0);
+	MatrixXd	borderEnd   = gridBorders_.block<12, 3>(0, 3);
 
-	// floor
-	if (renderSettings_.showFloor) {
-		viewer.data().set_mesh(meshV_, meshF_);
-	}
+	viewer.data().add_edges(borderStart, borderEnd, red);
+	// }
 }
 
 void MpmHook::mouseClicked(double x, double y, int button)

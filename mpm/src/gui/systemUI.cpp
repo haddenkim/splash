@@ -1,7 +1,6 @@
 #include "systemUI.h"
 #include "state/node.h"
 #include "state/particle.h"
-#include "state/particleNodeLink.h"
 
 #include <Eigen/Core>
 #include <imgui/imgui.h>
@@ -57,9 +56,9 @@ void SystemUI::displayParticleData()
 
 		Text("%i", i);
 		NextColumn();
-		Text("%0.2f %0.2f %0.2f", particle.position.x(), particle.position.y(), particle.position.z());
+		Text("%0.2f %0.2f %0.2f", particle.pos.x(), particle.pos.y(), particle.pos.z());
 		NextColumn();
-		Text("%0.2f %0.2f %0.2f", particle.velocity.x(), particle.velocity.y(), particle.velocity.z());
+		Text("%0.2f %0.2f %0.2f", particle.vel.x(), particle.vel.y(), particle.vel.z());
 		NextColumn();
 	}
 
@@ -70,53 +69,7 @@ void SystemUI::displayNodeData()
 {
 	NewLine();
 	Separator();
-	Text("active nodes: %i", system_.activeNodes_);
 
-	double			totMass = 0;
-	Eigen::Vector3d totMomentum;
-	totMomentum.setZero();
-
-	ImGui::Columns(5);
-
-	// Table headers
-	Text("index");
-	NextColumn();
-	Text("position");
-	NextColumn();
-	Text("mass");
-	NextColumn();
-	Text("velocity");
-	NextColumn();
-	Text("force");
-	NextColumn();
-
-	for (int i = 0; i < system_.nodes_.size(); i++) {
-		const Node& node = system_.nodes_[i];
-
-		if (!node.active) {
-			continue;
-		}
-
-		Text("%i", node.gridIndex);
-		NextColumn();
-		Text("%0.2f %0.2f %0.2f", node.position.x(), node.position.y(), node.position.z());
-		NextColumn();
-		Text("%0.3f", node.mass);
-		NextColumn();
-		Text("%0.2f %0.2f %0.2f", node.velocity.x(), node.velocity.y(), node.velocity.z());
-		NextColumn();
-		Text("%0.2f %0.2f %0.2f", node.force.x(), node.force.y(), node.force.z());
-		NextColumn();
-
-		totMass += node.mass;
-		totMomentum += node.mass * node.velocity;
-	}
-
-	ImGui::Columns(1);
-
-	NewLine();
-	Text("total mass: %0.3f", totMass);
-	Text("total momentum: %0.2f %0.2f %0.2f", totMomentum.x(), totMomentum.y(), totMomentum.z());
 }
 
 void SystemUI::displayLinkData()

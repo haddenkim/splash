@@ -1,6 +1,5 @@
 #pragma once
 
-#include "gui/debugUI.h"
 #include "gui/parametersUI.h"
 #include "gui/renderUI.h"
 #include "gui/statsUI.h"
@@ -12,8 +11,7 @@ class System;
 
 class UI {
 public:
-	UI(Solver*		   solver,
-	   RenderSettings& renderSettings,
+	UI(	   RenderSettings& renderSettings,
 	   SimParameters&  simParameters,
 	   System&		   system,
 	   Stats&		   stats);
@@ -21,14 +19,12 @@ public:
 	void draw();
 
 private:
-	bool showDebug_;
 	bool showRender_;
 	bool showParameters_;
 	bool showStats_;
 	bool showSystem_;
 
 	// sub ui
-	DebugUI		 debugUI_;
 	RenderUI	 renderUI_;
 	ParametersUI parametersUI_;
 	StatsUI		 statsUI_;

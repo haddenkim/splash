@@ -1,6 +1,6 @@
 #pragma once
 
-#include "state/stats.h"
+#include "settings/stats.h"
 
 class StatsUI {
 public:

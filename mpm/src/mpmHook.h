@@ -1,12 +1,9 @@
 #include "PhysicsHook.h"
-
-#include "gui/ui.h"
-#include "settings/renderSettings.h"
-#include "settings/simParameters.h"
-#include "state/stats.h"
+#include "state/particle.h"
 #include "state/system.h"
+#include "settings/simParameters.h"
 
-class Solver;
+#include <Eigen/Core>
 
 class MpmHook : public PhysicsHook {
 public:
@@ -26,31 +23,19 @@ public:
 
 	void mouseClicked(double x, double y, int button) override;
 
+	// log
+	int step = 0;
+
 	// libigl render data
 	Eigen::MatrixXd particlePositions_;
 	Eigen::MatrixXd particleColors_;
-	Eigen::MatrixXd particleVelocities_;
 
-	Eigen::MatrixXd gridActivePositions_;
-	Eigen::MatrixXd gridInactivePositions_;
-	Eigen::MatrixXd gridActiveColors_;
-	Eigen::MatrixXd gridVelocities_;
-	Eigen::MatrixXd gridForces_;
+	Eigen::MatrixXd gridCorners_;
+	Eigen::MatrixXd gridBorders_;
 
-	Eigen::MatrixXd meshV_;
-	Eigen::MatrixXi meshF_;
+	// simulation state
+	System system_;
 
 	// settings
-	RenderSettings renderSettings_;
-	SimParameters  simParameters_;
-
-	// simulation
-	System  system_;
-	Solver* solver_;
-
-	// GUI
-	UI ui_;
-
-	// stats
-	Stats stats_;
+	SimParameters simParameters_;
 };

@@ -1,70 +1,48 @@
 #pragma once
-
 #include <Eigen/Core>
 
 struct Particle {
-
-	Particle(double mass, double volume, Eigen::Vector3d position, Eigen::Vector3d velocity)
-		: mass(mass)
-		, volume(volume)
-		, position(position)
-		, velocity(velocity)
+	Particle(Eigen::Vector3d x, Eigen::Vector3d v, Eigen::RowVector3d color)
+		: pos(x)
+		, vel(v)
+		, color(color)
 	{
-		// TODO: engineer constructors or subclasses to allow alternative material properties and/or types
+		F.setIdentity();
+		R.setIdentity();
+		C.setZero();
+		Jp = 1.0;
 
-		// For now, particle is snow
-		// from Stomakhin 2013 MPM Snow Table 2
-		criticalCompression  = 2.5e-2;
-		criticalStretch		 = 7.5e-3;
-		hardening			 = 10.0;
-		double youngsModulus = 1.4e+5; // E
-		double poissonsRatio = 0.2;	// ν
-
-		// compute and store initial mu and lambda (eq 47)
-		mu0		= youngsModulus / (2 * (1 + poissonsRatio));
-		lambda0 = youngsModulus * poissonsRatio / ((1 + poissonsRatio) * (1 - 2 * poissonsRatio));
-
-		// set inital affine state
-		affineState.setZero();
-
-		// set inital deformation state
-		// deformationGradient.setIdentity();
-		elasticGradient.setIdentity();
-		elasticDeterminant = 1.0;
-		plasticGradient.setIdentity();
-		plasticDeterminant = 1.0;
-		elasticRotation.setIdentity();
-		// symmetric.setIdentity();
-
-		// plasticDeterminant = 1.0;
+		B.setZero();
+		F_E.setIdentity();
+		F_P.setIdentity();
 	}
 
-	// TODO: consider converting this to static variables or sim parameters, as they do not change per particle (unless simulating heterogenous material)
-	double criticalCompression; // θ_c
-	double criticalStretch;		// θ_s
-	double hardening;			// ξ
-	double mu0;					// μ shear modulus
-	double lambda0;				// λ Lame's first parameter
+	// Position and velocity
+	Eigen::Vector3d pos; // position
+	Eigen::Vector3d vel; // velocity
 
-	// fixed state
-	double mass;   // m
-	double volume; // V
+	Eigen::Matrix3d F;  // deformation gradient
+	Eigen::Matrix3d R;  // rotational decomposition of F
+	double			Jp; // determinant of the plastic deformation gradient
 
-	// time dependent state
-	Eigen::Vector3d position; // x
-	Eigen::Vector3d velocity; // v
+	// Affine momentum from APIC
+	Eigen::Matrix3d C; //
 
-	Eigen::Matrix3d affineState; // B
+	Eigen::RowVector3d color; // rendering color
 
-	// Eigen::Matrix3d deformationGradient; // F
-	Eigen::Matrix3d elasticGradient;	//# F_E elastic part of deformation gradient F
-	double			elasticDeterminant; //# J_E jacobian determinant of elastic gradient
-	Eigen::Matrix3d plasticGradient;	// F_P plastic part of deformation gradient F
-	double			plasticDeterminant; //# J_P jacobian determinant of plastic gradient
-	Eigen::Matrix3d elasticRotation;	//# R_E rotation component of polar decomposition of elastic gradient F
-	// Eigen::Matrix3d symmetric;			 // S symmetric component of polar decomposition of deformation gradient F
+	// TODO engineer way to vary these parameters
+	const double mass = 1.0; // mass
+	const double vol  = 1.0; // volume
+
+	Eigen::Matrix3d B; // affine state
+
+	Eigen::Matrix3d F_E; //  elastic part of deformation gradient F
+	Eigen::Matrix3d F_P; //  plastic part of deformation gradient F
 
 	// time integration bookkeeping
-	Eigen::Matrix3d nodalForceContribution;
-	// Eigen::Matrix3d pk1Stress; // P - first Piola-Kirchoff Stress
+	Eigen::Vector3d w[3];			// w_aip
+	Eigen::Vector3d wGrad[3]; // ∇w_aip
+
+	Eigen::Matrix3d VPFT;			  // V_p * P(F_p) * (F_p)^T (eq 189)
+	Eigen::Matrix3d velocityGradient; // accumulation of ∇v_p = Σ_i(v_i * ∇w_ip) (eq 181) (stomakhin step 7)
 };

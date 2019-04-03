@@ -33,8 +33,8 @@ public:
 		menu.callback_draw_viewer_menu = drawGUI;
 
 		// initial camera position
-		viewer.core.camera_eye	= Eigen::Vector3f(5, 5, 15);
-		viewer.core.camera_center = Eigen::Vector3f(5, 0, 5);
+		viewer.core.camera_eye	= Eigen::Vector3f(0.5, 2, 2);
+		viewer.core.camera_center = Eigen::Vector3f(0.5, 0.5, 0.5);
 	}
 
 	void start()

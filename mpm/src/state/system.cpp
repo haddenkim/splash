@@ -1,54 +1,26 @@
 #include "system.h"
-
-#include <cassert>
-#include <vector>
+#include <Eigen/Dense>
 
 using namespace Eigen;
 
-System::System(double cellSize, Eigen::Vector3d worldSize)
-	: cellSize_(cellSize)
-	, worldSize_(worldSize)
+System::System()
 {
-	initGrid();
 }
 
-void System::addParticle(double m, double vol, Eigen::Vector3d position, Eigen::Vector3d velocity)
-{
-	particles_.emplace_back(Particle(m,
-									 vol,
-									 position,
-									 velocity));
-}
-
-void System::clearParticles()
+void System::clear()
 {
 	particles_.clear();
 }
 
-Node* System::getNodeAt(int x, int y, int z)
+void System::addCube(Vector3d center, Vector3d velocity, RowVector3d color)
 {
-	int index = z * (gridSize_.x() * gridSize_.y()) + y * gridSize_.x() + x;
+	int	particleCount = 1000;
+	double scale		 = 0.1; // 8 grid units or 1/10 world space
 
-	assert(index < nodes_.size());
+	for (int i = 0; i < particleCount; i++) {
 
-	return &nodes_[index];
-}
+		Vector3d position = Vector3d::Random(3) * scale + center; // scale and translate
 
-void System::initGrid()
-{
-	// integer grid size
-	gridSize_ = (worldSize_ / cellSize_).cast<int>() + Vector3i(1, 1, 1);
-
-	// initialize nodes
-	int ni = 0;
-
-	for (double k = 0.0; k <= worldSize_.z(); k += cellSize_) {
-		for (double j = 0.0; j <= worldSize_.y(); j += cellSize_) {
-			for (double i = 0.0; i <= worldSize_.x(); i += cellSize_) {
-
-				nodes_.emplace_back(Node(ni, Vector3d(i, j, k)));
-				ni++;
-			}
-		}
+		particles_.emplace_back(Particle(position, velocity, color));
 	}
 }

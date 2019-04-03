@@ -1,39 +1,29 @@
 #pragma once
-
 #include "state/node.h"
 #include "state/particle.h"
-#include "state/particleNodeLink.h"
-#include <Eigen/Core>
 #include <vector>
 
 class System {
 public:
-	System(double cellSize, Eigen::Vector3d worldSize);
+	System();
 
-	void addParticle(double m, double vol, Eigen::Vector3d position, Eigen::Vector3d velocity);
-	void clearParticles();
+	void clear();
+	void addCube(Eigen::Vector3d center, Eigen::Vector3d velocity, Eigen::RowVector3d color);
 
-	Node* getNodeAt(int x, int y, int z);
+	// grid dimensions
+	static const int n = 80; // Grid resolution (cells)
+	static const int gridSize = 81;		 // number of nodes in each dimension
+	double			 dx		  = 1.0 / n; // distance between nodes
 
-	// particle
+	// array of particle structs
 	std::vector<Particle> particles_;
+	// x , y , z order of grid ndoes
+	Node			nodes_[gridSize][gridSize][gridSize];
 
-	// grid z > y > x
-	std::vector<Node> nodes_;
-	int				  activeNodes_;
 
-	// particle grid links
-	// TODO: find alternative data structure for 2 way (node + particle) iterators
-	std::vector<std::vector<ParticleNodeLink>> linksByNode_;	 // list of each Node's particle links. order matching node list
-	std::vector<std::vector<ParticleNodeLink>> linksByParticle_; // list of each particle's links. order matching particle list
 
-	// dimensions
-	double			cellSize_;	 // uniform size of individual cell (node to node spacing) in world frame
-	Eigen::Vector3d worldOrigin_; // origin in world frame
-	// Eigen::Vector3d cellSize_;	// size of an individual cell (node to node spacing) in world frame
-	Eigen::Vector3i gridSize_;	// number of nodes in grid
-	Eigen::Vector3d worldSize_;   // size of grid in world frame
 
-private:
-	void initGrid();
+
+	// boundaries
+	double boundary = 0.05;
 };

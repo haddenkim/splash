@@ -1,409 +1,293 @@
 #include "serialSolver.h"
-#include "solver/interpolation.h"
+#include "solver/svd.h"
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
-SerialSolver::SerialSolver()
-	: Solver()
+void SerialSolver::advance(System& system, const SimParameters parameters)
 {
-}
-
-void SerialSolver::simulateOneTick(System& system, Stats& stats, const SimParameters parameters)
-{
-	assert(currentStep == SolverStep::SOL_COMPLETE);
-
-	/* Reset grid */
 	resetGrid(system);
-
-	/* Particle to grid links, weights and weight gradients */
-	computeParticleNodeLinks(system);
-
-	/* Particle to grid transfer (P2G) */
-	transferParticleToGrid(system, parameters.timestep);
-
-	/* Identify grid degrees of freedom */
-	identifyDegreesOfFreedom(system);
-
-	/* Compute explicit grid forces */
-	computeGridForces(system, parameters);
-
-	/* Grid velocity update */
-	updateGridVelocities(system, parameters.timestep);
-
-	/* Grid to particle transfer (G2P) + Update particle deformation gradient */
-	transferGridToParticle(system, parameters.timestep);
-
-	/* Particle advection */
-	advectParticle(system, parameters.timestep);
-
-	// log stats
-	stats.simTime += parameters.timestep;
-}
-
-void SerialSolver::advanceToStep(SolverStep targetStep, System& system, const SimParameters parameters)
-{
-	if (targetStep > currentStep || currentStep == SolverStep::SOL_COMPLETE) {
-
-		// progress until target step
-		while (currentStep != targetStep) {
-			advance(currentStep);
-
-			switch (currentStep) {
-			case SolverStep::SOL_RESET:
-				resetGrid(system);
-				break;
-
-			case SolverStep::SOL_LINKS:
-				computeParticleNodeLinks(system);
-				break;
-
-			case SolverStep::SOL_P2G:
-				transferParticleToGrid(system, parameters.timestep);
-				break;
-
-			case SolverStep::SOL_DOF:
-				identifyDegreesOfFreedom(system);
-				break;
-
-			case SolverStep::SOL_FORCE:
-				computeGridForces(system, parameters);
-				break;
-
-			case SolverStep::SOL_VEL:
-				updateGridVelocities(system, parameters.timestep);
-				break;
-
-			case SolverStep::SOL_G2P:
-				transferGridToParticle(system, parameters.timestep);
-				break;
-
-			case SolverStep::SOL_ADVECT:
-				advectParticle(system, parameters.timestep);
-				break;
-			case SolverStep::SOL_COMPLETE:
-				break;
-
-			default:
-				break;
-			}
-		}
-	} else {
-		// TODO: consider advancing to the next step's target step
-		assert(!"Attempting to step backwards.");
-	}
+	transferP2G(system, parameters);
+	computeGrid(system, parameters);
+	transferG2P(system, parameters);
+	computeParticle(system, parameters);
 }
 
 void SerialSolver::resetGrid(System& system)
 {
-	// Concurrency note: write system + node + link
+	for (int i = 0; i < system.gridSize; i++) {
+		for (int j = 0; j < system.gridSize; j++) {
+			for (int k = 0; k < system.gridSize; k++) {
+				// reference to node
+				Node& node = system.nodes_[i][j][k];
 
-	system.activeNodes_ = 0;
+				node.vel.setZero();
+				node.mass = 0;
+				node.force.setZero();
 
-	for (Node& node : system.nodes_) {
-		node.mass = 0.0;
-		node.momentum.setZero();
-		node.velocity.setZero();
-		node.force.setZero();
-		node.active = false;
-	}
-
-	// TODO optimize this for performance
-	system.linksByNode_.clear();
-	system.linksByParticle_.clear();
-
-	for (int ni = 0; ni < system.nodes_.size(); ni++) {
-		system.linksByNode_.emplace_back(std::vector<ParticleNodeLink>());
-	}
-
-	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		system.linksByParticle_.emplace_back(std::vector<ParticleNodeLink>());
-	}
-}
-
-void SerialSolver::computeParticleNodeLinks(System& system)
-{
-	// Concurrency note: read particle + node, writes link
-
-	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		Particle& particle = system.particles_[pi];
-
-		// retrieve the subset of nodes local to each particle
-		auto kernelNodes = getKernelNodes(particle.position, system);
-
-		// loop through subset
-		for (Node* node : kernelNodes) {
-			assert(node);
-
-			// vector from node to particle in grid frame
-			Vector3d vecIP = (particle.position - node->position) / system.cellSize_;
-
-			// compute distance components
-			double distX = vecIP.x();
-			double distY = vecIP.y();
-			double distZ = vecIP.z();
-
-			// TODO: consider alternative interpolation kernels (cubic, trilinear)
-			// compute weight components w_aip (eq 123)
-			double weightX = bSplineQuadratic(distX);
-			double weightY = bSplineQuadratic(distY);
-			double weightZ = bSplineQuadratic(distZ);
-
-			// compute weight N_ip (eq. 121)
-			double weight = weightX * weightY * weightZ;
-
-			// if weight is 0, skip this link
-			if (weight == 0) {
-				continue;
+				node.particles.clear();
+				node.weightGradients.clear();
 			}
-
-			// compute weight gradient components ∇w_aip
-			double gradX = bSplineQuadraticSlope(distX);
-			double gradY = bSplineQuadraticSlope(distY);
-			double gradZ = bSplineQuadraticSlope(distZ);
-
-			// compute weight gradient ∇N_ip (eq. after 124)
-			Vector3d weightGrad = Vector3d(gradX * weightY * weightZ,
-										   weightX * gradY * weightZ,
-										   weightX * weightY * gradZ)
-				/ system.cellSize_;
-
-			// accumulate inertia-like tensor D_p (eq. 174)
-			// Not needed for quadratic or cubic interpolations (paragraph after eq. 176)
-
-			// TODO: find alternative data structure for 2 way (node + particle) iterators
-			// perhaps a sparse matrix and interate rows for nodes, columns for particles
-			// add to node list
-			system.linksByNode_[node->gridIndex].emplace_back(ParticleNodeLink(pi, node->gridIndex, weight, weightGrad));
-
-			// add to particle list
-			system.linksByParticle_[pi].push_back(ParticleNodeLink(pi, node->gridIndex, weight, weightGrad));
 		}
+	}
+
+	// also reset part bookkeeping values
+	for (Particle& part : system.particles_) {
+		part.VPFT.setZero();
+		part.velocityGradient.setZero();
 	}
 }
 
-void SerialSolver::identifyDegreesOfFreedom(System& system)
+void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 {
-	// Concurrency note: write system + node
-
-	// loop through node
-	for (int ni = 0; ni < system.nodes_.size(); ni++) {
-		Node& node = system.nodes_[ni];
-
-		// node.active = !system.linksByNode_[ni].empty();
-		if (node.mass > 0) {
-			node.active = true;
-			system.activeNodes_++;
-		}
-	}
-}
-
-void SerialSolver::transferParticleToGrid(System& system, const float timestep)
-{
-	// Concurrency note: read particle + link, write node
-
 	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-	double commonDInverseScalar = 0.25 / system.cellSize_ / system.cellSize_; // (1/4 * (∆x)^2 * I)^-1
+	double commonDInvScalar = 4.0 / system.dx / system.dx; // (1/4 * (∆x)^2 * I)^-1
 
-	// loop through node
-	for (int ni = 0; ni < system.nodes_.size(); ni++) {
-		Node& node = system.nodes_[ni];
+	for (Particle& part : system.particles_) {
+		// TODO: investigate alternative interpolation kernels
+		// for now quadradic kernel (eq 123)
 
-		// skip if node has no particle links
-		if (system.linksByNode_[ni].empty()) {
-			continue;
+		// part position in grid frame
+		Vector3d partGridPos = part.pos.array() / system.dx;
+
+		// lowest node position in grid frame of part's kernel
+		Vector3i startNode = (partGridPos.array() - 0.5).cast<int>();
+
+		// vector from base node to part in grid frame
+		Vector3d vecIPBase = partGridPos - startNode.cast<double>();
+
+		// compute weight components w_aip (eq 123)
+		// Vector3d w[3];
+		part.w[0] = 0.50 * (1.5 - vecIPBase.array()).square(); // start node
+		part.w[1] = 0.75 - (vecIPBase.array() - 1.0).square(); // middle node
+		part.w[2] = 0.50 * (vecIPBase.array() - 0.5).square(); // end node
+
+		// compute weight gradient components ∇w_aip
+		// Vector3d wg[3];
+		part.wGrad[0] = vecIPBase.array() - 1.5;		  // start node
+		part.wGrad[1] = -2.0 * (vecIPBase.array() - 1.0); // middle node
+		part.wGrad[2] = vecIPBase.array() - 0.5;		  // end node
+
+		// loop through kernel nodes
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				for (int k = 0; k < 3; k++) {
+
+					int gridX = startNode.x() + i;
+					int gridY = startNode.y() + j;
+					int gridZ = startNode.z() + k;
+
+					// skip if out of bounds
+					if (gridX < 0 || gridY < 0 || gridZ < 0
+						|| gridX > system.gridSize || gridY > system.gridSize || gridZ > system.gridSize) {
+						continue;
+					}
+
+					// compute weight N_ip (eq. 121)
+					double weight = part.w[i].x() * part.w[j].y() * part.w[k].z();
+
+					// compute weight gradient ∇N_ip (eq. after 124)'
+					Vector3d weightGradient = Vector3d(part.wGrad[i].x() * part.w[j].y() * part.w[k].z(),
+													   part.w[i].x() * part.wGrad[j].y() * part.w[k].z(),
+													   part.w[i].x() * part.w[j].y() * part.wGrad[k].z())
+						/ system.dx;
+
+					// reference to node
+					Node& node = system.nodes_[gridX][gridY][gridZ];
+
+					// accumulate mass (eq. 172)
+					node.mass += weight * part.mass;
+
+					// compute vector from part to node in world frame (x_i - x_p)
+					Vector3d vecPI = (Vector3d(i, j, k) - vecIPBase) * system.dx;
+
+					// accumulate momentum (eq. 173)
+					// stores in node velocity, next mpm step computes velocity from momentum
+					node.vel += weight * part.mass * (part.vel + part.B * commonDInvScalar * vecPI);
+
+					// store link to this part for convenience
+					node.particles.push_back(&part);
+
+					// store in node
+					node.weightGradients.push_back(weightGradient);
+				}
+			}
 		}
 
-		// loop through node's links
-		for (const ParticleNodeLink& link : system.linksByNode_[ni]) {
-			// convienience/readability
-			const Particle& particle = system.particles_[link.particleIndex];
-
-			// accumulate mass (eq. 172)
-			node.mass += link.weight * particle.mass;
-
-			// accumulate momentum (eq. 173)
-			node.momentum += link.weight * particle.mass * (particle.velocity + particle.affineState * commonDInverseScalar * (node.position - particle.position));
-		}
-
-		// compute velocity
-		node.velocity = node.momentum / node.mass;
-	}
-}
-
-void SerialSolver::computeGridForces(System& system, const SimParameters& parameters)
-{
-	// Concurrency note: read link, writes particle + node
-
-	// compute internal forces
-	// Fixed Corotated Constitutive Model (sec 6.3)
-
-	// for convenience / optimization, pre-compute particle constant
-	for (Particle& particle : system.particles_) {
-
+		// for convenience / optimization, pre-compute part constant contribution to node force
 		// compute current mu and lambda (eq 87)
-		double exp	= std::exp(particle.hardening * (1.0 - particle.plasticDeterminant));
-		double mu	 = particle.mu0 * exp;
-		double lambda = particle.lambda0 * exp;
+		double exp	= std::exp(parameters.hardening * (1.0 - part.Jp));
+		double mu	 = parameters.mu0 * exp;
+		double lambda = parameters.lambda0 * exp;
 
-		// compute first Piola-Kirchoff Stresss P (eq 52)
-		Matrix3d pk1Stress = 2 * mu * (particle.elasticGradient - particle.elasticRotation)
-			+ lambda * (particle.elasticDeterminant - 1) * particle.elasticDeterminant * particle.elasticGradient.inverse().transpose();
+		// compute determinant of elastic deformation gradient J_E
+		double Je = part.F.determinant();
 
-		// compute the per particle constant contribution to nodal elastic force V_p * P_p * (F_p)^T (eq 189)
-		particle.nodalForceContribution = particle.volume * pk1Stress * particle.elasticGradient.transpose();
+		// compute first Piola-Kirchoff Stresss P (eq 52) * F^T
+		Matrix3d PFT = 2 * mu * (part.F - part.R) * part.F.transpose() + (lambda * (Je - 1) * Je) * Matrix3d::Identity();
 
-		assert(!particle.nodalForceContribution.hasNaN());
-	}
-
-	// compute node force
-	// loop through node
-	for (int ni = 0; ni < system.nodes_.size(); ni++) {
-		Node& node = system.nodes_[ni];
-
-		// skip inactive nodes
-		if (!node.active) {
-			continue;
-		}
-
-		// loop through node's links
-		for (const ParticleNodeLink& link : system.linksByNode_[ni]) {
-			// convienience/readability
-			const Particle& particle = system.particles_[link.particleIndex];
-
-			// internal stress force f_i (eq 189)
-			node.force -= particle.nodalForceContribution * link.weightGradient;
-		}
-
-		// TODO: implement external force (ex. gravity)
-		if (parameters.gravityEnabled) {
-			node.force[1] -= parameters.gravityG * node.mass;
-		}
-
-		assert(!node.force.hasNaN());
+		// compute the per part constant contribution to nodal elastic force V_p * P_p * (F_p)^T (eq 189)
+		part.VPFT = part.vol * PFT;
 	}
 }
 
-void SerialSolver::updateGridVelocities(System& system, const float timestep)
+void SerialSolver::computeGrid(System& system, const SimParameters& parameters)
 {
-	// Concurrency note: writes node
+	// loop through all nodes
+	for (int i = 0; i <= system.n; i++) {
+		for (int j = 0; j <= system.n; j++) {
+			for (int k = 0; k <= system.n; k++) {
 
-	for (Node& node : system.nodes_) {
-		// skip inactive nodes
-		if (!node.active) {
-			continue;
-		}
+				Node& node = system.nodes_[i][j][k];
 
-		// symplectic euler update (eq 183)
-		node.velocity = node.velocity + timestep / node.mass * node.force;
+				// skip if node has no mass (aka no particles nearby)
+				if (node.mass > 0) {
 
-		assert(!node.velocity.hasNaN());
+					// compute velocity from momentum / mass
+					node.vel /= node.mass;
 
-		// TODO: boundary conditions + collisions
+					// internal stress force f_i (eq 189)
+					// loop through node's particles to accumulate internal force
+					for (int pi = 0; pi < node.particles.size(); pi++) {
+						Particle* part = node.particles[pi];
 
-		// temp: floor boundary at y = 1
-		if (node.position.y() < 1) {
-			node.velocity[1] = std::max(node.velocity.y(), 0.0);
+						node.force -= part->VPFT * node.weightGradients[pi];
+					}
+
+					// TODO: implement other external forces
+
+					// Gravity
+					if (parameters.gravityEnabled) {
+						node.force.y() -= parameters.gravityG * node.mass;
+					}
+
+					// update grid velocities
+					node.vel = node.vel + parameters.timestep * node.force / node.mass;
+
+					// enforce boundary conditions
+					// node's position  in world space
+					Vector3d worldPos = Vector3d(i, j, k) * system.dx;
+
+					// TODO: implement additional boundary conditions
+					// Sticky boundary - left, right, back, front wall, top ceiling
+					if (worldPos.x() < system.boundary			 // left wall
+						|| worldPos.x() > 1 - system.boundary	// right wall
+						|| worldPos.y() > 1 - system.boundary	// top wall (ceiling)
+						|| worldPos.z() < system.boundary		 // back wall
+						|| worldPos.z() > 1 - system.boundary) { // front wall
+						node.vel.setZero();
+					}
+
+					// Separate boundary - bottom floor
+					if (worldPos.y() < system.boundary) { // bottom wall (floor)
+						node.vel.y() = std::max(0.0, node.vel.y());
+					}
+				}
+			}
 		}
 	}
 }
 
-void SerialSolver::transferGridToParticle(System& system, const float timestep)
+void SerialSolver::transferG2P(System& system, const SimParameters& parameters)
 {
-	// Concurrency note: read node + link, writes particle
-
-	// loop through particle
-	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		Particle& particle = system.particles_[pi];
+	// loop through part
+	for (Particle& part : system.particles_) {
 
 		// reset velocity v_p and affine state B_p
-		particle.velocity.setZero();
-		particle.affineState.setZero();
+		part.vel.setZero();
+		part.B.setZero();
 
-		// hold accumulation of ∇v_p = Σ_i(v_i * ∇w_ip) (eq 181) (stomakhin step 7)
-		Matrix3d velocityGradient = Matrix3d::Zero();
+		// TODO: consider storing this during P2G avoiding recompute
+		// part position in grid frame
+		Vector3d partGridPos = part.pos.array() / system.dx;
 
-		// loop through particle's links
-		for (const ParticleNodeLink& link : system.linksByParticle_[pi]) {
-			// convienience/readability
-			const Node& node = system.nodes_[link.nodeIndex];
+		// lowest node position in grid frame of part's kernel
+		Vector3i startNode = (partGridPos.array() - 0.5).cast<int>();
 
-			// accumulate node's deformation update
-			velocityGradient += node.velocity * link.weightGradient.transpose();
+		// vector from base node to part in grid frame
+		Vector3d vecIPBase = partGridPos - startNode.cast<double>();
 
-			// accumulate velocity v_i (eq 175)
-			particle.velocity += link.weight * node.velocity;
+		// loop through kernel nodes
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				for (int k = 0; k < 3; k++) {
+					int gridX = startNode.x() + i;
+					int gridY = startNode.y() + j;
+					int gridZ = startNode.z() + k;
 
-			assert(!particle.velocity.hasNaN());
+					// skip if out of bounds
+					if (gridX < 0 || gridY < 0 || gridZ < 0
+						|| gridX > system.gridSize || gridY > system.gridSize || gridZ > system.gridSize) {
+						continue;
+					}
 
-			// acculumate affine state B_i (eq 176)
-			particle.affineState += link.weight * node.velocity * (node.position - particle.position).transpose();
-		}
+					// TODO: consider storing this during P2G avoiding recompute
+					// compute weight N_ip (eq. 121)
+					double weight = part.w[i].x() * part.w[j].y() * part.w[k].z();
 
-		// compute updated deformation gradient F_E_Tilda (eq 181 and paragraph above eq 80)
-		particle.elasticGradient = (Matrix3d::Identity() + timestep * velocityGradient) * particle.elasticGradient;
+					// compute weight gradient ∇N_ip (eq. after 124)'
+					Vector3d weightGradient = Vector3d(part.wGrad[i].x() * part.w[j].y() * part.w[k].z(),
+													   part.w[i].x() * part.wGrad[j].y() * part.w[k].z(),
+													   part.w[i].x() * part.w[j].y() * part.wGrad[k].z())
+						/ system.dx;
 
-		// compute overall deformation gradient F (eq 80)
-		Matrix3d deformationGradient = particle.elasticGradient * particle.plasticGradient;
+					// reference to node
+					Node& node = system.nodes_[gridX][gridY][gridZ];
 
-		// SVD decomposition of F_E_Tilda (eq 83)
-		JacobiSVD<Matrix3d> svd(particle.elasticGradient, ComputeFullU | ComputeFullV);
-		Matrix3d			U	 = svd.matrixU();		  // U
-		Vector3d			Sigma = svd.singularValues(); // Σ
-		Matrix3d			V	 = svd.matrixV();		  // V
+					// accumulate velocity v_i (eq 175)
+					part.vel += weight * node.vel;
 
-		// clamp singular values (eq 82)
-		Sigma = Sigma.cwiseMax(1.0 - particle.criticalCompression).cwiseMin(1.0 + particle.criticalStretch);
+					// compute vector from part to node in world frame (x_i - x_p)
+					Vector3d vecPI = (Vector3d(i, j, k) - vecIPBase) * system.dx;
 
-		// udpate elastic deformation gradient F_E (eq 84) and its determinant
-		particle.elasticGradient	= U * Sigma.asDiagonal() * V.transpose();
-		particle.elasticDeterminant = particle.elasticGradient.determinant();
+					// acculumate affine state B_i (eq 176)
+					part.B += weight * node.vel * vecPI.transpose();
 
-		// udpate plastic deformation gradient F_P (eq 86) and its determinant
-		particle.plasticGradient	= particle.elasticGradient.inverse() * deformationGradient;
-		particle.plasticDeterminant = particle.plasticGradient.determinant();
-
-		// update elastic rotation R_E (paragraph under eq 45)
-		particle.elasticRotation = U * V.transpose();
-	}
-
-	// TODO: boundary conditions + collisions
-}
-
-void SerialSolver::advectParticle(System& system, const float timestep)
-{
-	// Concurrency note: writes particle
-
-	for (Particle& particle : system.particles_) {
-		particle.position += timestep * particle.velocity;
-	}
-}
-
-std::vector<Node*> SerialSolver::getKernelNodes(const Eigen::Vector3d& position, System& system)
-{
-	std::vector<Node*> ret;
-
-	// TODO: investigate alternative interpolation kernels
-	// for now quadradic kernel (eq 123)
-
-	// lowest node position in grid frame
-	Vector3i startNode = (position / system.cellSize_ - Vector3d(0.5, 0.5, 0.5)).cast<int>();
-	// highest node position in grid frame
-	Vector3i endNode = startNode + Vector3i(3, 3, 3);
-
-	// adjust start and end nodes if out of grid bounds
-	startNode = startNode.cwiseMax(0.0);
-	endNode   = endNode.cwiseMin(system.gridSize_);
-
-	// i,k,j = node position in grid grame
-	for (int k = startNode.z(); k < endNode.z(); k++) {
-		for (int j = startNode.y(); j < endNode.y(); j++) {
-			for (int i = startNode.x(); i < endNode.x(); i++) {
-				// retrieve node and add to list
-				ret.push_back(system.getNodeAt(i, j, k));
+					// accumulate node's deformation update (eq 181)
+					part.velocityGradient += node.vel * weightGradient.transpose();
+				}
 			}
 		}
 	}
+}
 
-	return ret;
+void SerialSolver::computeParticle(System& system, const SimParameters& parameters)
+{
+	for (Particle& part : system.particles_) {
+		// Advection
+		part.pos += parameters.timestep * part.vel;
+
+		// compute updated elastic deformation gradient F_E_Tilda (eq 181 and paragraph above eq 80)
+		Matrix3d F_E_Tilda = (Matrix3d::Identity() + parameters.timestep * part.velocityGradient) * part.F;
+
+		// compute updated deformation gradient F (eq 80)
+		Matrix3d F = F_E_Tilda * part.F_P;
+
+		// Matrix3d U, sig, V;
+		// svd(F_E_Tilda, U, sig, V);
+		// for (int i = 0; i < 3; i++) {
+		// 	sig.row(i)[i] = std::max(sig.row(i)[i], 1.0 - parameters.criticalCompression);
+		// 	sig.row(i)[i] = std::min(sig.row(i)[i], 1.0 + parameters.criticalStretch);
+		// }
+
+		// SVD of F_E_Tilda (eq 83)
+		JacobiSVD<Matrix3d> svd(F_E_Tilda, ComputeFullU | ComputeFullV);
+		Matrix3d			U   = svd.matrixU();		// U
+		Vector3d			Sig = svd.singularValues(); // Σ
+		Matrix3d			V   = svd.matrixV();		// V
+
+		// clamp singular values (eq 82)
+		for (int i = 0; i < 3; i++) {
+			Sig(i) = std::max(Sig(i), 1.0 - parameters.criticalCompression);
+			Sig(i) = std::min(Sig(i), 1.0 + parameters.criticalStretch);
+		}
+
+		// update part F (eq 84) and R (paragraph under eq 45)
+		part.F = U * Sig.asDiagonal() * V.transpose();
+		part.R = U * V.transpose();
+
+		// compute part F_P (eq 86) and its determinant J_P
+		part.F_P = part.F.inverse() * F;
+		part.Jp  = part.F_P.determinant();
+	}
 }
