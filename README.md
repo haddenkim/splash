@@ -47,13 +47,13 @@ From the binary directory (build/bin/)
 ## Demo
 
 ### Falling blocks
-Captured 1 in 15 simulation frames.
+10,000 particles per block on 50x50x50 grid. Captured 1 in 15 simulation frames.
 ![](image/fall.gif)
 
 ### Block thrown at wall
-Captured 1 in 10 simulation frames.
+10,000 particles per block on 50x50x50 grid. Captured 1 in 10 simulation frames.
 ![](image/wall.gif)
 
 ### Colliding blocks
-Captured 1 in 10 simulation frames.
+10,000 particles per block on 50x50x50 grid. Captured 1 in 10 simulation frames.
 ![](image/collide.gif)
