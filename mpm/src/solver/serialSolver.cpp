@@ -6,14 +6,26 @@ using namespace Eigen;
 
 void SerialSolver::advance(System& system, const SimParameters parameters, Stats& stats)
 {
-	resetGrid(system);
-	transferP2G(system, parameters);
-	computeGrid(system, parameters);
-	transferG2P(system, parameters);
-	computeParticle(system, parameters);
+	auto start = std::chrono::high_resolution_clock::now();
 
+	resetGrid(system);
+	clock(stats.timeReset, start);
+
+	transferP2G(system, parameters);
+	clock(stats.timeP2G, start);
+
+	computeGrid(system, parameters);
+	clock(stats.timeGrid, start);
+
+	transferG2P(system, parameters);
+	clock(stats.timeG2P, start);
+
+	computeParticle(system, parameters);
+	clock(stats.timePart, start);
+
+	// log stats
 	stats.simTime += parameters.timestep;
-	stats.stepCount ++;
+	stats.stepCount++;
 }
 
 void SerialSolver::resetGrid(System& system)
@@ -23,7 +35,7 @@ void SerialSolver::resetGrid(System& system)
 			for (int k = 0; k < system.gridSize; k++) {
 				// reference to node
 				Node& node = system.nodes_[i][j][k];
-				
+
 				node.mass = 0;
 				node.vel.setZero();
 				node.force.setZero();

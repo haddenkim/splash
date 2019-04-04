@@ -13,4 +13,11 @@ struct Stats{
 
     int stepCount;
     float simTime;
+
+    // sim clock
+    int timeReset;
+    int timeP2G;
+    int timeGrid;
+    int timeG2P;
+    int timePart;
 };

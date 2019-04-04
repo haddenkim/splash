@@ -19,5 +19,36 @@ void StatsUI::draw()
 	Text("Step count: %i", stats_.stepCount);
 	Text("Sim time: %0.4f", stats_.simTime);
 
+	ImGui::NewLine();
+	Text("Execution time (microseconds) of last step\n");
+	Columns(2);
+
+	Text("Reset Grid");
+	NextColumn();
+	Text("%i", stats_.timeReset);
+	NextColumn();
+
+	Text("P2G");
+	NextColumn();
+	Text("%i", stats_.timeP2G);
+	NextColumn();
+
+	Text("Grid Dynamics");
+	NextColumn();
+	Text("%i", stats_.timeGrid);
+	NextColumn();
+
+	Text("P2G");
+	NextColumn();
+	Text("%i", stats_.timeG2P);
+	NextColumn();
+
+	Text("Particle Update");
+	NextColumn();
+	Text("%i", stats_.timePart);
+	NextColumn();
+
+	Columns(1);
+
 	End();
 }
