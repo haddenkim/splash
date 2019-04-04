@@ -46,11 +46,13 @@ From the binary directory (build/bin/)
 ## Demo
 
 ### Falling blocks
-![](out/fall.gif)
-
+![](image/fall.gif)
+Captured 1 in 15 simulation frames.
 
 ### Block thrown at wall
-![](out/wall.gif)
+![](image/wall.gif)
+Captured 1 in 10 simulation frames.
 
 ### Colliding blocks
-![](out/collide.gif)
+![](image/collide.gif)
+Captured 1 in 10 simulation frames.
