@@ -2,7 +2,7 @@
 Splash is a physical simulation using the APIC Material Point Method. 
 
 This program implements the material point method described in the [2016 SIGGRAPH Course Notes](https://www.seas.upenn.edu/~cffjiang/research/mpmcourse/mpmcourse.pdf) by Jiang  et al.
-It also draws from details described in [Stomakhin 2013](http://alexey.stomakhin.com/research/snow.html) and [Jiang 2015](https://www.seas.upenn.edu/~cffjiang/research/apic/paper.pdf).
+It also draws from details elaborated in [Stomakhin 2013](http://alexey.stomakhin.com/research/snow.html) and [Jiang 2015](https://www.seas.upenn.edu/~cffjiang/research/apic/paper.pdf).
 
 The purpose of this project is to first learn the core principles of the Material Point Method. 
 The second goal of this project is to learn and implement various parallel programming methods.
