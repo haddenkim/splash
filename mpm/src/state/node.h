@@ -5,11 +5,12 @@
 struct Particle;
 
 struct Node {
-	// time integration bookkeeping
-	double			mass; // mass
-	Eigen::Vector3d vel;  // velocity
+	// for rendering
+	Eigen::Vector3d vel; // velocity
 	Eigen::Vector3d force;
 
-	std::vector<Particle*>		 particles;
+	// time integration bookkeeping
+	double						 mass;			  // mass
+	std::vector<Particle*>		 particles;		  // nearby particles that contibute to this node
 	std::vector<Eigen::Vector3d> weightGradients; // per particle
 };
