@@ -50,6 +50,30 @@ MpmHook::MpmHook()
 		gridBorders_.row(10) << LUB, LUF;
 		gridBorders_.row(11) << RUB, RUF;
 	}
+
+	// grid nodes
+	{
+		int gsize = system_.gridSize * system_.gridSize * system_.gridSize;
+		gridPositions_.resize(gsize, 3);
+		gridVelocities_.resize(gsize, 3);
+		gridForces_.resize(gsize, 3);
+
+		int gi = 0;
+		for (int i = 0; i < system_.gridSize; i++) {
+			for (int j = 0; j < system_.gridSize; j++) {
+				for (int k = 0; k < system_.gridSize; k++) {
+
+					Vector3d nodePosition			  = Vector3d(i, j, k);
+					gridPositions_.block<1, 3>(gi, 0) = nodePosition;
+
+					gi++;
+				}
+			}
+		}
+
+		// scale
+		gridPositions_ *= system_.dx;
+	}
 }
 
 void MpmHook::drawGUI()
@@ -100,6 +124,8 @@ void MpmHook::initSimulation()
 						Vector3d(30, 0, 0),
 						RowVector3d(0, 1, 0));
 	}
+
+	renderNeedsUpdate_ = true;
 }
 
 void MpmHook::tick()
@@ -110,22 +136,27 @@ bool MpmHook::simulateOneStep()
 {
 	solver_->advance(system_, simParameters_, stats_);
 
+	renderNeedsUpdate_ = true;
+
 	return false;
 }
 
 void MpmHook::updateRenderGeometry()
 {
-	if (stats_.stepCount % renderSettings_.drawInverval == 0) {
+	if (stats_.stepCount % renderSettings_.drawInverval == 0 && renderNeedsUpdate_) {
 
 		// particles
 		{
 			int psize = system_.particles_.size();
 			particlePositions_.resize(psize, 3);
 			particleColors_.resize(psize, 3);
+			particleVelocities_.resize(psize, 3);
 
 			for (int i = 0; i < psize; i++) {
 				particlePositions_.block<1, 3>(i, 0) = system_.particles_[i].pos;
 				particleColors_.block<1, 3>(i, 0)	= system_.particles_[i].color;
+
+				particleVelocities_.block<1, 3>(i, 0) = system_.particles_[i].vel;
 			}
 
 			// particlePositions_.resize(system_.partCount, 3);
@@ -134,6 +165,26 @@ void MpmHook::updateRenderGeometry()
 			// particlePositions_ = system_.partPos;
 			// particleColors_	= system_.partColor;
 		}
+
+		// grid
+		{
+			int gi = 0;
+			for (int i = 0; i < system_.gridSize; i++) {
+				for (int j = 0; j < system_.gridSize; j++) {
+					for (int k = 0; k < system_.gridSize; k++) {
+						const Node& node = system_.nodes_[i][j][k];
+
+						gridVelocities_.block<1, 3>(gi, 0) = node.vel;
+						gridForces_.block<1, 3>(gi, 0)	 = node.force;
+
+						gi++;
+					}
+				}
+			}
+		}
+
+		// update flag
+		renderNeedsUpdate_ = false;
 	}
 }
 
@@ -151,6 +202,11 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 			viewer.data().add_points(particlePositions_, particleColors_);
 		}
 
+		if (renderSettings_.showParticleVelocity) {
+			RowVector3d red(1, 0, 0);
+			viewer.data().add_edges(particlePositions_, particlePositions_ + (particleVelocities_ * renderSettings_.vectorScale), red);
+		}
+
 		if (renderSettings_.showBoundary) {
 			// boundary
 			RowVector3d red(1, 0, 0);
@@ -160,8 +216,18 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 			viewer.data().add_edges(borderStart, borderEnd, red);
 		}
 
-		// TODO optionally render grid, and vector fields
+		// grid
+		if (renderSettings_.showGridVelocity) {
+			RowVector3d red(1, 0, 0);
+			viewer.data().add_edges(gridPositions_, gridPositions_ + (gridVelocities_ * renderSettings_.vectorScale), red);
+		}
 
+		if (renderSettings_.showGridForce) {
+			RowVector3d red(1, 0, 0);
+			viewer.data().add_edges(gridPositions_, gridPositions_ + (gridForces_ * renderSettings_.vectorScale), red);
+		}
+
+		// write png
 		if (renderSettings_.writePNG && !isPaused()) {
 			writePNG(viewer);
 		}

@@ -9,6 +9,7 @@ struct RenderSettings {
 
 		pointSize = 3.f;
 		lineWidth = 4.0f;
+		vectorScale = 0.01f;
 
 		showParticles		 = true;
 		showParticleVelocity = false;
@@ -27,6 +28,7 @@ struct RenderSettings {
 	// libigl settings
 	float pointSize;
 	float lineWidth;
+	float vectorScale;
 
 	// toggle visibility
 	bool showParticles;

@@ -30,10 +30,15 @@ public:
 	void writePNG(igl::opengl::glfw::Viewer& viewer);
 
 	// libigl render data
+	bool renderNeedsUpdate_;
 	Eigen::MatrixXd particlePositions_;
 	Eigen::MatrixXd particleColors_;
+	Eigen::MatrixXd particleVelocities_;
 
-	Eigen::MatrixXd gridCorners_;
+	Eigen::MatrixXd gridPositions_;
+	Eigen::MatrixXd gridVelocities_;
+	Eigen::MatrixXd gridForces_;
+
 	Eigen::MatrixXd gridBorders_;
 
 	// simulation state
