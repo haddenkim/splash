@@ -5,6 +5,7 @@ using namespace Eigen;
 
 MpmHook::MpmHook()
 	: PhysicsHook()
+	, ui_(renderSettings_, simParameters_, stats_, system_)
 {
 	double s = system_.boundary;	 // start
 	double e = 1 - system_.boundary; // end
@@ -47,12 +48,13 @@ MpmHook::MpmHook()
 
 void MpmHook::drawGUI()
 {
+	ui_.draw();
 }
 
 void MpmHook::initSimulation()
 {
-	step = 0;
 	system_.clear();
+	stats_.reset();
 
 	// falling blocks
 	// {
@@ -75,8 +77,8 @@ void MpmHook::initSimulation()
 						Vector3d(10, 0, 10),
 						RowVector3d(0, 1, 1));
 
-		system_.addCube(Vector3d(0.8, 0.7, 0.8),
-						Vector3d(-10, 0, -10),
+		system_.addCube(Vector3d(0.8, 0.7, 0.5),
+						Vector3d(-10, 0, 0),
 						RowVector3d(1, 1, 0));
 	}
 
@@ -94,55 +96,58 @@ void MpmHook::tick()
 
 bool MpmHook::simulateOneStep()
 {
-	step++;
-
-	SerialSolver::advance(system_, simParameters_);
+	SerialSolver::advance(system_, simParameters_, stats_);
 
 	return false;
 }
 
 void MpmHook::updateRenderGeometry()
 {
-	// if (step % int(frame_dt / dt) == 0) {
+	if (stats_.stepCount % renderSettings_.drawInverval == 0) {
 
-	// particles
-	{
-		int psize = system_.particles_.size();
-		particlePositions_.resize(psize, 3);
-		particleColors_.resize(psize, 3);
+		// particles
+		{
+			int psize = system_.particles_.size();
+			particlePositions_.resize(psize, 3);
+			particleColors_.resize(psize, 3);
 
-		for (int i = 0; i < psize; i++) {
-			particlePositions_.block<1, 3>(i, 0) = system_.particles_[i].pos;
-			particleColors_.block<1, 3>(i, 0)	= system_.particles_[i].color;
+			for (int i = 0; i < psize; i++) {
+				particlePositions_.block<1, 3>(i, 0) = system_.particles_[i].pos;
+				particleColors_.block<1, 3>(i, 0)	= system_.particles_[i].color;
+			}
+
+			// particlePositions_.resize(system_.partCount, 3);
+			// particleColors_.resize(system_.partCount, 3);
+
+			// particlePositions_ = system_.partPos;
+			// particleColors_	= system_.partColor;
 		}
-
-		// particlePositions_.resize(system_.partCount, 3);
-		// particleColors_.resize(system_.partCount, 3);
-
-		// particlePositions_ = system_.partPos;
-		// particleColors_	= system_.partColor;
 	}
-	// }
 }
 
 void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 {
-	// if (step % int(frame_dt / dt) == 0) {
+	viewer.data().point_size = renderSettings_.pointSize;
+	viewer.data().line_width = renderSettings_.lineWidth;
 
-	viewer.data().clear();
+	if (stats_.stepCount % renderSettings_.drawInverval == 0) {
 
-	viewer.data().point_size = 3.0;
+		viewer.data().clear();
 
-	// particles
-	viewer.data().add_points(particlePositions_, particleColors_);
+		// particles
+		if (renderSettings_.showParticles) {
+			viewer.data().add_points(particlePositions_, particleColors_);
+		}
 
-	// boundary
-	RowVector3d red(1, 0, 0);
-	MatrixXd	borderStart = gridBorders_.block<12, 3>(0, 0);
-	MatrixXd	borderEnd   = gridBorders_.block<12, 3>(0, 3);
+		if (renderSettings_.showBoundary) {
+			// boundary
+			RowVector3d red(1, 0, 0);
+			MatrixXd	borderStart = gridBorders_.block<12, 3>(0, 0);
+			MatrixXd	borderEnd   = gridBorders_.block<12, 3>(0, 3);
 
-	viewer.data().add_edges(borderStart, borderEnd, red);
-	// }
+			viewer.data().add_edges(borderStart, borderEnd, red);
+		}
+	}
 }
 
 void MpmHook::mouseClicked(double x, double y, int button)

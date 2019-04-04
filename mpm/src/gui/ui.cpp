@@ -1,12 +1,12 @@
 #include "ui.h"
 #include <imgui/imgui.h>
 
-UI::UI(	   RenderSettings& renderSettings,
+UI::UI(RenderSettings& renderSettings,
 	   SimParameters&  simParameters,
-	   System&		   system,
-	   Stats&		   stats)
-	:  parametersUI_(simParameters)
-	, renderUI_(renderSettings)
+	   Stats&		   stats,
+	   System&		   system)
+	: renderUI_(renderSettings)
+	, parametersUI_(simParameters)
 	, statsUI_(stats)
 	, systemUI_(system)
 {
@@ -19,18 +19,19 @@ UI::UI(	   RenderSettings& renderSettings,
 void UI::draw()
 {
 	if (ImGui::CollapsingHeader("Additional UI", ImGuiTreeNodeFlags_DefaultOpen)) {
-		ImGui::MenuItem("Sim Parameters", NULL, &showParameters_);
 		ImGui::MenuItem("Renderer", NULL, &showRender_);
+		ImGui::MenuItem("Sim Parameters", NULL, &showParameters_);
 		ImGui::MenuItem("Stats", NULL, &showStats_);
 		ImGui::MenuItem("System", NULL, &showSystem_);
 	}
 
-	if (showParameters_) {
-		parametersUI_.draw();
-	}
 	if (showRender_) {
 		renderUI_.draw();
 	}
+	if (showParameters_) {
+		parametersUI_.draw();
+	}
+
 	if (showStats_) {
 		statsUI_.draw();
 	}

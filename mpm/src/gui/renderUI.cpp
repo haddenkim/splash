@@ -11,6 +11,8 @@ void RenderUI::draw()
 	ImGui::Separator();
 	ImGui::NewLine();
 
+	ImGui::SliderInt("Draw Interval (sim steps)", &renderSettings_.drawInverval, 1, 100);
+
 	ImGui::SliderFloat("Point Size", &renderSettings_.pointSize, 0.1f, 20.0f);
 	ImGui::SliderFloat("Line Width", &renderSettings_.lineWidth, 0.1f, 10.0f);
 
@@ -25,5 +27,5 @@ void RenderUI::draw()
 	ImGui::Checkbox("Grid Force", &renderSettings_.showGridForce);
 
 	ImGui::NewLine();
-	ImGui::Checkbox("Floor", &renderSettings_.showFloor);
+	ImGui::Checkbox("World Boundary", &renderSettings_.showBoundary);
 }

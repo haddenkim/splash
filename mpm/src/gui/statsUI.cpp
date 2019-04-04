@@ -16,7 +16,8 @@ void StatsUI::draw()
 	SetNextWindowSize(ImVec2(200, 160), ImGuiSetCond_FirstUseEver);
 	Begin("Stats", nullptr, ImGuiWindowFlags_NoSavedSettings);
 
-	Text("Sim Time: %0.3f", stats_.simTime);
+	Text("Step count: %i", stats_.stepCount);
+	Text("Sim time: %0.4f", stats_.simTime);
 
 	End();
 }

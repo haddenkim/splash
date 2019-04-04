@@ -4,13 +4,16 @@
 
 using namespace Eigen;
 
-void SerialSolver::advance(System& system, const SimParameters parameters)
+void SerialSolver::advance(System& system, const SimParameters parameters, Stats& stats)
 {
 	resetGrid(system);
 	transferP2G(system, parameters);
 	computeGrid(system, parameters);
 	transferG2P(system, parameters);
 	computeParticle(system, parameters);
+
+	stats.simTime += parameters.timestep;
+	stats.stepCount ++;
 }
 
 void SerialSolver::resetGrid(System& system)

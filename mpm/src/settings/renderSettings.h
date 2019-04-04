@@ -4,8 +4,10 @@ struct RenderSettings {
 	RenderSettings()
 	{
 		// default settings
+		drawInverval = 1;
+
 		pointSize = 3.f;
-        lineWidth = 1.0f;
+		lineWidth = 1.0f;
 
 		showParticles		 = true;
 		showParticleVelocity = false;
@@ -14,12 +16,15 @@ struct RenderSettings {
 		showActiveGrid   = false;
 		showGridVelocity = false;
 
-		showFloor = true;
+		showBoundary = true;
 	};
+
+	// draw rate
+	int drawInverval;
 
 	// libigl settings
 	float pointSize;
-    float lineWidth;
+	float lineWidth;
 
 	// toggle visibility
 	bool showParticles;
@@ -30,5 +35,5 @@ struct RenderSettings {
 	bool showGridVelocity;
 	bool showGridForce;
 
-	bool showFloor;
+	bool showBoundary;
 };

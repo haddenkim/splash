@@ -96,15 +96,6 @@ public:
 			if (ImGui::Button("Reset Sim", ImVec2(-1, 0))) {
 				hook->reset();
 			}
-
-			static int numSteps = 1;
-			ImGui::SliderInt("n", &numSteps, 1, 100);
-			ImGui::SameLine();
-			if (ImGui::Button("Sim n Steps", ImVec2(-1, 0))) {
-				for (int i = 0; i < numSteps; i++) {
-					hook->simulateOneStep();
-				}
-			}
 		}
 
 		// continue drawing hook specific gui

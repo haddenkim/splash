@@ -11,10 +11,10 @@ class System;
 
 class UI {
 public:
-	UI(	   RenderSettings& renderSettings,
+	UI(RenderSettings& renderSettings,
 	   SimParameters&  simParameters,
-	   System&		   system,
-	   Stats&		   stats);
+	   Stats&		   stats,
+	   System&		   system);
 
 	void draw();
 

@@ -1,8 +1,10 @@
 #include "PhysicsHook.h"
+#include "gui/ui.h"
+#include "settings/renderSettings.h"
+#include "settings/simParameters.h"
+#include "settings/stats.h"
 #include "state/particle.h"
 #include "state/system.h"
-#include "settings/simParameters.h"
-
 #include <Eigen/Core>
 
 class MpmHook : public PhysicsHook {
@@ -23,9 +25,6 @@ public:
 
 	void mouseClicked(double x, double y, int button) override;
 
-	// log
-	int step = 0;
-
 	// libigl render data
 	Eigen::MatrixXd particlePositions_;
 	Eigen::MatrixXd particleColors_;
@@ -36,6 +35,11 @@ public:
 	// simulation state
 	System system_;
 
-	// settings
-	SimParameters simParameters_;
+	// settings + stats
+	SimParameters  simParameters_;
+	RenderSettings renderSettings_;
+	Stats		   stats_;
+
+	// ui
+	UI ui_;
 };
