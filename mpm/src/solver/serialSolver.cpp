@@ -20,9 +20,9 @@ void SerialSolver::resetGrid(System& system)
 			for (int k = 0; k < system.gridSize; k++) {
 				// reference to node
 				Node& node = system.nodes_[i][j][k];
-
-				node.vel.setZero();
+				
 				node.mass = 0;
+				node.vel.setZero();
 				node.force.setZero();
 
 				node.particles.clear();

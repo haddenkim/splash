@@ -2,13 +2,13 @@
 #include <Eigen/Dense>
 
 struct Interpolation {
-	Interpolation(Eigen::Vector3d position, double h)
+	Interpolation(Eigen::Vector3d position, double dx)
 	{
 		// TODO: consider subclassing this for alternative interpolations (ex. linear, cubic)
 		// For now all functions here implement Quadradic B-spline interpolation (eq 123)
 
 		// part position in grid frame
-		Eigen::Vector3d partGridPos = position / h;
+		Eigen::Vector3d partGridPos = position / dx;
 
 		// lowest node position in grid frame of part's kernel
 		node0 = (partGridPos.array() - 0.5).cast<int>();
@@ -17,16 +17,14 @@ struct Interpolation {
 		vecI0P = partGridPos - node0.cast<double>();
 
 		// compute weight components w_aip (eq 123)
-		// Vector3d w[3];
 		w[0] = 0.50 * (1.5 - vecI0P.array()).square(); // start node
 		w[1] = 0.75 - (vecI0P.array() - 1.0).square(); // middle node
 		w[2] = 0.50 * (vecI0P.array() - 0.5).square(); // end node
 
-		// compute weight gradient components ∇w_aip
-		// Vector3d wg[3];
-		wGrad_H[0] = (vecI0P.array() - 1.5) / h;		  // start node
-		wGrad_H[1] = (-2.0 * (vecI0P.array() - 1.0)) / h; // middle node
-		wGrad_H[2] = (vecI0P.array() - 0.5) / h;		  // end node
+		// compute weight gradient components ∇w_aip / h
+		wGrad_H[0] = (vecI0P.array() - 1.5) / dx;		  // start node
+		wGrad_H[1] = (-2.0 * (vecI0P.array() - 1.0)) / dx; // middle node
+		wGrad_H[2] = (vecI0P.array() - 0.5) / dx;		  // end node
 	}
 
 	double weight(int i, int j, int k)
@@ -49,14 +47,14 @@ struct Interpolation {
 
 	Eigen::Vector3d vecPI(int i, int j, int k)
 	{
-		// compute vector from part to node in grid frame (x_i - x_p) / h
+		// compute vector from part to node in grid frame (x_i - x_p) / dx
 		return Eigen::Vector3d(i, j, k) - vecI0P;
 	}
 
-	static double DInverseScalar(double h)
+	static double DInverseScalar(double dx)
 	{
 		// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-		return 4.0 / h / h; // (1/4 * (∆x)^2 * I)^-1
+		return 4.0 / dx / dx; // (1/4 * (∆x)^2 * I)^-1
 	}
 
 	// data
@@ -64,5 +62,5 @@ struct Interpolation {
 	Eigen::Vector3d vecI0P; // vector from start node (I_0) to particle in grid frame
 
 	Eigen::Vector3d w[3];		// w_aip
-	Eigen::Vector3d wGrad_H[3]; // ∇w_aip / h
+	Eigen::Vector3d wGrad_H[3]; // ∇w_aip / dx
 };

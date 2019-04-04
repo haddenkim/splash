@@ -6,19 +6,22 @@ using namespace Eigen;
 MpmHook::MpmHook()
 	: PhysicsHook()
 {
+	double s = system_.boundary;	 // start
+	double e = 1 - system_.boundary; // end
+
 	// bounds
 	{ // x = L(eft) or R(ight)
 		// y = D(own) or U(p)
 		// z = B(ack) or F(ront)
-		RowVector3d LDB(0, 0, 0);
-		RowVector3d RDB(1, 0, 0);
-		RowVector3d LUB(0, 1, 0);
-		RowVector3d RUB(1, 1, 0);
+		RowVector3d LDB(s, s, s);
+		RowVector3d RDB(e, s, s);
+		RowVector3d LUB(s, e, s);
+		RowVector3d RUB(e, e, s);
 
-		RowVector3d LDF(0, 0, 1);
-		RowVector3d RDF(1, 0, 1);
-		RowVector3d LUF(0, 1, 1);
-		RowVector3d RUF(1, 1, 1);
+		RowVector3d LDF(s, s, e);
+		RowVector3d RDF(e, s, e);
+		RowVector3d LUF(s, e, e);
+		RowVector3d RUF(e, e, e);
 
 		gridBorders_.resize(12, 6); // 3 start , 3 end
 
@@ -68,11 +71,11 @@ void MpmHook::initSimulation()
 
 	// colliding blocks
 	{
-		system_.addCube(Vector3d(0.15, 0.8, 0.15),
+		system_.addCube(Vector3d(0.2, 0.8, 0.2),
 						Vector3d(10, 0, 10),
 						RowVector3d(0, 1, 1));
 
-		system_.addCube(Vector3d(0.80, 0.7, 0.80),
+		system_.addCube(Vector3d(0.8, 0.7, 0.8),
 						Vector3d(-10, 0, -10),
 						RowVector3d(1, 1, 0));
 	}
