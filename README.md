@@ -18,6 +18,7 @@ Splash uses [libigl](https://libigl.github.io/) for rendering.
 ## Compiling
 Dependencies
 - [libigl](https://libigl.github.io/) and its dependencies (imgui, opengl)
+- [lodepng](https://github.com/lvandeve/lodepng) (included)
 
 If not installed, simply clone https://github.com/libigl/libigl into this project's lib/ folder
 ```
