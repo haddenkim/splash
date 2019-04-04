@@ -25,6 +25,8 @@ public:
 
 	void mouseClicked(double x, double y, int button) override;
 
+	void writePNG(igl::opengl::glfw::Viewer& viewer);
+
 	// libigl render data
 	Eigen::MatrixXd particlePositions_;
 	Eigen::MatrixXd particleColors_;

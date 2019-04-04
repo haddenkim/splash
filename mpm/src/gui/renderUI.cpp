@@ -11,6 +11,7 @@ void RenderUI::draw()
 	ImGui::Separator();
 	ImGui::NewLine();
 
+	ImGui::Checkbox("Write PNG", &renderSettings_.writePNG);
 	ImGui::SliderInt("Draw Interval (sim steps)", &renderSettings_.drawInverval, 1, 100);
 
 	ImGui::SliderFloat("Point Size", &renderSettings_.pointSize, 0.1f, 20.0f);

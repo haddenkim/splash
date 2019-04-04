@@ -1,6 +1,9 @@
 #include "mpmHook.h"
 #include "solver/serialSolver.h"
 
+// TODO clean up linking lodepng
+#include "../../lib/lodepng/lodepng.h"
+
 using namespace Eigen;
 
 MpmHook::MpmHook()
@@ -57,35 +60,35 @@ void MpmHook::initSimulation()
 	stats_.reset();
 
 	// falling blocks
-	// {
-	// 	system_.addCube(Vector3d(0.5, 0.4, 0.5),
-	// 					Vector3d(0, 0, 0),
-	// 					RowVector3d(1, 0, 1));
-
-	// 	system_.addCube(Vector3d(0.4, 0.6, 0.5),
-	// 					Vector3d(0, 0, 0),
-	// 					RowVector3d(1, 1, 0));
-
-	// 	system_.addCube(Vector3d(0.5, 0.8, 0.6),
-	// 					  Vector3d(0, 0, 0),
-	// 					  RowVector3d(0, 1, 0));
-	// }
-
-	// colliding blocks
 	{
-		system_.addCube(Vector3d(0.2, 0.8, 0.2),
-						Vector3d(10, 0, 10),
-						RowVector3d(0, 1, 1));
+		system_.addCube(Vector3d(0.5, 0.4, 0.5),
+						Vector3d(0, 0, 0),
+						RowVector3d(1, 0, 1));
 
-		system_.addCube(Vector3d(0.8, 0.7, 0.5),
-						Vector3d(-10, 0, 0),
+		system_.addCube(Vector3d(0.4, 0.6, 0.5),
+						Vector3d(0, 0, 0),
 						RowVector3d(1, 1, 0));
+
+		system_.addCube(Vector3d(0.5, 0.8, 0.6),
+						  Vector3d(0, 0, 0),
+						  RowVector3d(0, 1, 0));
 	}
 
-	// // block to wall
+	// // colliding blocks
+	// {
+	// 	system_.addCube(Vector3d(0.2, 0.8, 0.2),
+	// 					Vector3d(10, 0, 10),
+	// 					RowVector3d(0, 1, 1));
+
+	// 	system_.addCube(Vector3d(0.8, 0.7, 0.5),
+	// 					Vector3d(-10, 0, 0),
+	// 					RowVector3d(1, 1, 0));
+	// }
+
+	// block to wall
 	// {
 	// 	system_.addCube(Vector3d(0.5, 0.7, 0.5),
-	// 					Vector3d(10, 0, 0),
+	// 					Vector3d(30, 0, 0),
 	// 					RowVector3d(1, 1, 0));
 	// }
 }
@@ -147,9 +150,62 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 
 			viewer.data().add_edges(borderStart, borderEnd, red);
 		}
+
+		if (renderSettings_.writePNG && !isPaused()) {
+			writePNG(viewer);
+		}
 	}
 }
 
 void MpmHook::mouseClicked(double x, double y, int button)
 {
+}
+
+void MpmHook::writePNG(igl::opengl::glfw::Viewer& viewer)
+{
+	static int pngCount = 0;
+	int		   w		= 640;
+	int		   h		= 400;
+
+	// Allocate temporary buffers for 1280x800 image
+	Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> R(w, h);
+	Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> G(w, h);
+	Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> B(w, h);
+	Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> A(w, h);
+
+	// Draw the scene in the buffers
+	viewer.core.draw_buffer(viewer.data(), false, R, G, B, A);
+
+	// Save it to a PNG
+	std::string str;
+	if (pngCount < 10)
+		str = "00" + std::to_string(pngCount);
+	else if (pngCount < 100)
+		str = "0" + std::to_string(pngCount);
+	else {
+		str = std::to_string(pngCount);
+	}
+
+	std::string filename = "out/" + str + ".png";
+	// igl::png::writePNG(R, G, B, A, filename); // broken at libigl
+
+	const int				   comp			   = 4;				  // 4 Channels Red, Green, Blue, Alpha
+	const int				   stride_in_bytes = R.rows() * comp; // Length of one row in bytes
+	std::vector<unsigned char> data(R.size() * comp, 0);		  // The image itself;
+
+	for (unsigned i = 0; i < R.rows(); ++i) {
+		for (unsigned j = 0; j < R.cols(); ++j) {
+			data[(j * R.rows() * comp) + (i * comp) + 0] = R(i, R.cols() - 1 - j);
+			data[(j * R.rows() * comp) + (i * comp) + 1] = G(i, R.cols() - 1 - j);
+			data[(j * R.rows() * comp) + (i * comp) + 2] = B(i, R.cols() - 1 - j);
+			data[(j * R.rows() * comp) + (i * comp) + 3] = A(i, R.cols() - 1 - j);
+		}
+	}
+
+	//Encode the image
+	unsigned error = lodepng::encode(filename, data, w, h);
+	printf("lodepng err: %ui\n", error);
+
+	// for file name
+	pngCount++;
 }

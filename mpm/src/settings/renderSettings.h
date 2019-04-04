@@ -5,9 +5,10 @@ struct RenderSettings {
 	{
 		// default settings
 		drawInverval = 1;
+		writePNG	 = false;
 
 		pointSize = 3.f;
-		lineWidth = 1.0f;
+		lineWidth = 4.0f;
 
 		showParticles		 = true;
 		showParticleVelocity = false;
@@ -20,7 +21,8 @@ struct RenderSettings {
 	};
 
 	// draw rate
-	int drawInverval;
+	int  drawInverval;
+	bool writePNG;
 
 	// libigl settings
 	float pointSize;
