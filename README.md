@@ -10,10 +10,10 @@ The second goal of this project is to learn and implement various parallel progr
 Splash uses [libigl](https://libigl.github.io/) for rendering.
 
 ## Features/TODO
--[x] Serial Explicit MPM
--[ ] Serial Implicit MPM
--[ ] OpenMP Implicit MPM
--[ ] MPI Implicit MPM
+* [x] Serial Explicit MPM
+* [ ] Serial Implicit MPM
+* [ ] OpenMP Implicit MPM
+* [ ] MPI Implicit MPM
 
 ## Compiling
 Dependencies
