@@ -108,22 +108,22 @@ void MpmHook::initSimulation()
 	// }
 
 	// colliding blocks
-	// {
-	// 	system_.addCube(Vector3d(0.2, 0.8, 0.2),
-	// 					Vector3d(10, 0, 10),
-	// 					RowVector3d(0, 1, 1));
-
-	// 	system_.addCube(Vector3d(0.8, 0.7, 0.5),
-	// 					Vector3d(-10, 0, 0),
-	// 					RowVector3d(1, 0, 1));
-	// }
-
-	// block to wall
 	{
-		system_.addCube(Vector3d(0.5, 0.7, 0.5),
-						Vector3d(30, 0, 0),
-						RowVector3d(0, 1, 0));
+		system_.addCube(Vector3d(0.2, 0.8, 0.2),
+						Vector3d(10, 0, 10),
+						RowVector3d(0, 1, 1));
+
+		system_.addCube(Vector3d(0.8, 0.7, 0.5),
+						Vector3d(-10, 0, 0),
+						RowVector3d(1, 0, 1));
 	}
+
+	// // block to wall
+	// {
+	// 	system_.addCube(Vector3d(0.5, 0.7, 0.5),
+	// 					Vector3d(30, 0, 0),
+	// 					RowVector3d(0, 1, 0));
+	// }
 
 	renderNeedsUpdate_ = true;
 }
