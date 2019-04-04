@@ -42,3 +42,15 @@ From the binary directory (build/bin/)
 ```
 ./splash
 ```
+
+## Demo
+
+### Falling blocks
+![](out/fall.gif)
+
+
+### Block thrown at wall
+![](out/wall.gif)
+
+### Colliding blocks
+![](out/collide.gif)
