@@ -59,6 +59,8 @@ void MpmHook::initSimulation()
 	system_.clear();
 	stats_.reset();
 
+	// TODO Engineer process to modify at run time
+
 	// falling blocks
 	{
 		system_.addCube(Vector3d(0.5, 0.4, 0.5),
@@ -151,6 +153,8 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 			viewer.data().add_edges(borderStart, borderEnd, red);
 		}
 
+		// TODO optionally render grid, and vector fields
+
 		if (renderSettings_.writePNG && !isPaused()) {
 			writePNG(viewer);
 		}
@@ -167,7 +171,7 @@ void MpmHook::writePNG(igl::opengl::glfw::Viewer& viewer)
 	int		   w		= 640;
 	int		   h		= 400;
 
-	// Allocate temporary buffers for 1280x800 image
+	// Allocate temporary buffers for image
 	Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> R(w, h);
 	Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> G(w, h);
 	Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> B(w, h);
@@ -176,7 +180,7 @@ void MpmHook::writePNG(igl::opengl::glfw::Viewer& viewer)
 	// Draw the scene in the buffers
 	viewer.core.draw_buffer(viewer.data(), false, R, G, B, A);
 
-	// Save it to a PNG
+	// padding filename
 	std::string str;
 	if (pngCount < 10)
 		str = "00" + std::to_string(pngCount);
@@ -189,6 +193,7 @@ void MpmHook::writePNG(igl::opengl::glfw::Viewer& viewer)
 	std::string filename = "out/" + str + ".png";
 	// igl::png::writePNG(R, G, B, A, filename); // broken at libigl
 
+	// interleave buffer channels
 	const int				   comp			   = 4;				  // 4 Channels Red, Green, Blue, Alpha
 	const int				   stride_in_bytes = R.rows() * comp; // Length of one row in bytes
 	std::vector<unsigned char> data(R.size() * comp, 0);		  // The image itself;
@@ -202,8 +207,10 @@ void MpmHook::writePNG(igl::opengl::glfw::Viewer& viewer)
 		}
 	}
 
-	//Encode the image
+	// Encode the image
 	unsigned error = lodepng::encode(filename, data, w, h);
+
+	// TODO: handle errors
 	printf("lodepng err: %ui\n", error);
 
 	// for file name
