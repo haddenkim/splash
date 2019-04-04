@@ -52,30 +52,30 @@ void MpmHook::initSimulation()
 	system_.clear();
 
 	// falling blocks
-	{
-		system_.addCube(Vector3d(0.55, 0.45, 0.5),
-						Vector3d(0, 0, 0),
-						RowVector3d(0, 0, 1));
+	// {
+	// 	system_.addCube(Vector3d(0.5, 0.4, 0.5),
+	// 					Vector3d(0, 0, 0),
+	// 					RowVector3d(1, 0, 1));
 
-		system_.addCube(Vector3d(0.45, 0.65, 0.5),
-						Vector3d(0, 0, 0),
-						RowVector3d(1, 1, 0));
+	// 	system_.addCube(Vector3d(0.4, 0.6, 0.5),
+	// 					Vector3d(0, 0, 0),
+	// 					RowVector3d(1, 1, 0));
 
-		system_.addCube(Vector3d(0.55, 0.85, 0.6),
-						  Vector3d(0, 0, 0),
-						  RowVector3d(0, 1, 0));
-	}
+	// 	system_.addCube(Vector3d(0.5, 0.8, 0.6),
+	// 					  Vector3d(0, 0, 0),
+	// 					  RowVector3d(0, 1, 0));
+	// }
 
 	// colliding blocks
-	// {
-	// 	system_.addCube(Vector3d(0.15, 0.8, 0.15),
-	// 					Vector3d(10, 0, 10),
-	// 					RowVector3d(0, 0, 1));
+	{
+		system_.addCube(Vector3d(0.15, 0.8, 0.15),
+						Vector3d(10, 0, 10),
+						RowVector3d(0, 1, 1));
 
-	// 	system_.addCube(Vector3d(0.85, 0.7, 0.85),
-	// 					Vector3d(-10, 0, -10),
-	// 					RowVector3d(1, 1, 0));
-	// }
+		system_.addCube(Vector3d(0.80, 0.7, 0.80),
+						Vector3d(-10, 0, -10),
+						RowVector3d(1, 1, 0));
+	}
 
 	// // block to wall
 	// {

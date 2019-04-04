@@ -1,5 +1,5 @@
 #include "serialSolver.h"
-#include "solver/svd.h"
+#include "solver/interpolation.h"
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -31,51 +31,32 @@ void SerialSolver::resetGrid(System& system)
 		}
 	}
 
-	// also reset part bookkeeping values
+	// also reset particle bookkeeping values
 	for (Particle& part : system.particles_) {
 		part.VPFT.setZero();
-		part.velocityGradient.setZero();
+		part.velGradient.setZero();
 	}
 }
 
 void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 {
 	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-	double commonDInvScalar = 4.0 / system.dx / system.dx; // (1/4 * (∆x)^2 * I)^-1
+	double commonDInvScalar = Interpolation::DInverseScalar(system.dx);
 
 	for (Particle& part : system.particles_) {
-		// TODO: investigate alternative interpolation kernels
-		// for now quadradic kernel (eq 123)
 
-		// part position in grid frame
-		Vector3d partGridPos = part.pos.array() / system.dx;
-
-		// lowest node position in grid frame of part's kernel
-		Vector3i startNode = (partGridPos.array() - 0.5).cast<int>();
-
-		// vector from base node to part in grid frame
-		Vector3d vecIPBase = partGridPos - startNode.cast<double>();
-
-		// compute weight components w_aip (eq 123)
-		// Vector3d w[3];
-		part.w[0] = 0.50 * (1.5 - vecIPBase.array()).square(); // start node
-		part.w[1] = 0.75 - (vecIPBase.array() - 1.0).square(); // middle node
-		part.w[2] = 0.50 * (vecIPBase.array() - 0.5).square(); // end node
-
-		// compute weight gradient components ∇w_aip
-		// Vector3d wg[3];
-		part.wGrad[0] = vecIPBase.array() - 1.5;		  // start node
-		part.wGrad[1] = -2.0 * (vecIPBase.array() - 1.0); // middle node
-		part.wGrad[2] = vecIPBase.array() - 0.5;		  // end node
+		// compute the particle's kernel
+		part.kernel = new Interpolation(part.pos, system.dx);
 
 		// loop through kernel nodes
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {
 				for (int k = 0; k < 3; k++) {
 
-					int gridX = startNode.x() + i;
-					int gridY = startNode.y() + j;
-					int gridZ = startNode.z() + k;
+					// compute grid frame coordinates of this iter's node
+					int gridX = part.kernel->node0.x() + i;
+					int gridY = part.kernel->node0.y() + j;
+					int gridZ = part.kernel->node0.z() + k;
 
 					// skip if out of bounds
 					if (gridX < 0 || gridY < 0 || gridZ < 0
@@ -83,14 +64,8 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 						continue;
 					}
 
-					// compute weight N_ip (eq. 121)
-					double weight = part.w[i].x() * part.w[j].y() * part.w[k].z();
-
-					// compute weight gradient ∇N_ip (eq. after 124)'
-					Vector3d weightGradient = Vector3d(part.wGrad[i].x() * part.w[j].y() * part.w[k].z(),
-													   part.w[i].x() * part.wGrad[j].y() * part.w[k].z(),
-													   part.w[i].x() * part.w[j].y() * part.wGrad[k].z())
-						/ system.dx;
+					double   weight			= part.kernel->weight(i, j, k);
+					Vector3d weightGradient = part.kernel->weightGradient(i, j, k);
 
 					// reference to node
 					Node& node = system.nodes_[gridX][gridY][gridZ];
@@ -99,7 +74,7 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 					node.mass += weight * part.mass;
 
 					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = (Vector3d(i, j, k) - vecIPBase) * system.dx;
+					Vector3d vecPI = part.kernel->vecPI(i, j, k) * system.dx;
 
 					// accumulate momentum (eq. 173)
 					// stores in node velocity, next mpm step computes velocity from momentum
@@ -116,15 +91,15 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 
 		// for convenience / optimization, pre-compute part constant contribution to node force
 		// compute current mu and lambda (eq 87)
-		double exp	= std::exp(parameters.hardening * (1.0 - part.Jp));
+		double exp	= std::exp(parameters.hardening * (1.0 - part.J_P));
 		double mu	 = parameters.mu0 * exp;
 		double lambda = parameters.lambda0 * exp;
 
 		// compute determinant of elastic deformation gradient J_E
-		double Je = part.F.determinant();
+		double J_E = part.F_E.determinant();
 
 		// compute first Piola-Kirchoff Stresss P (eq 52) * F^T
-		Matrix3d PFT = 2 * mu * (part.F - part.R) * part.F.transpose() + (lambda * (Je - 1) * Je) * Matrix3d::Identity();
+		Matrix3d PFT = 2 * mu * (part.F_E - part.R_E) * part.F_E.transpose() + (lambda * (J_E - 1) * J_E) * Matrix3d::Identity();
 
 		// compute the per part constant contribution to nodal elastic force V_p * P_p * (F_p)^T (eq 189)
 		part.VPFT = part.vol * PFT;
@@ -134,54 +109,57 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 void SerialSolver::computeGrid(System& system, const SimParameters& parameters)
 {
 	// loop through all nodes
-	for (int i = 0; i <= system.n; i++) {
-		for (int j = 0; j <= system.n; j++) {
-			for (int k = 0; k <= system.n; k++) {
+	for (int i = 0; i < system.gridSize; i++) {
+		for (int j = 0; j < system.gridSize; j++) {
+			for (int k = 0; k < system.gridSize; k++) {
 
+				// reference to node
 				Node& node = system.nodes_[i][j][k];
 
 				// skip if node has no mass (aka no particles nearby)
-				if (node.mass > 0) {
+				if (node.mass == 0) {
+					continue;
+				}
 
-					// compute velocity from momentum / mass
-					node.vel /= node.mass;
+				// compute velocity from momentum / mass
+				node.vel /= node.mass;
 
-					// internal stress force f_i (eq 189)
-					// loop through node's particles to accumulate internal force
-					for (int pi = 0; pi < node.particles.size(); pi++) {
-						Particle* part = node.particles[pi];
+				// internal stress force f_i (eq 189)
+				// loop through node's particles to accumulate internal force
+				for (int pi = 0; pi < node.particles.size(); pi++) {
+					Particle* part = node.particles[pi];
 
-						node.force -= part->VPFT * node.weightGradients[pi];
-					}
+					node.force -= part->VPFT * node.weightGradients[pi];
+				}
 
-					// TODO: implement other external forces
+				// TODO: implement other external forces
+				// Gravity
+				if (parameters.gravityEnabled) {
+					node.force.y() -= parameters.gravityG * node.mass;
+				}
 
-					// Gravity
-					if (parameters.gravityEnabled) {
-						node.force.y() -= parameters.gravityG * node.mass;
-					}
+				// update grid velocities
+				node.vel = node.vel + parameters.timestep * node.force / node.mass;
 
-					// update grid velocities
-					node.vel = node.vel + parameters.timestep * node.force / node.mass;
+				// enforce boundary conditions
+				// node's position  in world space
+				Vector3d worldPos = Vector3d(i, j, k) * system.dx;
 
-					// enforce boundary conditions
-					// node's position  in world space
-					Vector3d worldPos = Vector3d(i, j, k) * system.dx;
+				// TODO: implement additional boundary conditions
+				// TODO: consider more sophisticated collision response (ex. coefficients of restitution)
 
-					// TODO: implement additional boundary conditions
-					// Sticky boundary - left, right, back, front wall, top ceiling
-					if (worldPos.x() < system.boundary			 // left wall
-						|| worldPos.x() > 1 - system.boundary	// right wall
-						|| worldPos.y() > 1 - system.boundary	// top wall (ceiling)
-						|| worldPos.z() < system.boundary		 // back wall
-						|| worldPos.z() > 1 - system.boundary) { // front wall
-						node.vel.setZero();
-					}
+				// non-elastic boundaries
+				if (worldPos.x() < system.boundary			 // left wall
+					|| worldPos.x() > 1 - system.boundary	// right wall
+					|| worldPos.y() > 1 - system.boundary	// top wall (ceiling)
+					|| worldPos.z() < system.boundary		 // back wall
+					|| worldPos.z() > 1 - system.boundary) { // front wall
+					node.vel.setZero();
+				}
 
-					// Separate boundary - bottom floor
-					if (worldPos.y() < system.boundary) { // bottom wall (floor)
-						node.vel.y() = std::max(0.0, node.vel.y());
-					}
+				// elastic boundary
+				if (worldPos.y() < system.boundary) { // bottom wall (floor)
+					node.vel.y() = std::max(0.0, node.vel.y());
 				}
 			}
 		}
@@ -197,23 +175,15 @@ void SerialSolver::transferG2P(System& system, const SimParameters& parameters)
 		part.vel.setZero();
 		part.B.setZero();
 
-		// TODO: consider storing this during P2G avoiding recompute
-		// part position in grid frame
-		Vector3d partGridPos = part.pos.array() / system.dx;
-
-		// lowest node position in grid frame of part's kernel
-		Vector3i startNode = (partGridPos.array() - 0.5).cast<int>();
-
-		// vector from base node to part in grid frame
-		Vector3d vecIPBase = partGridPos - startNode.cast<double>();
-
 		// loop through kernel nodes
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {
 				for (int k = 0; k < 3; k++) {
-					int gridX = startNode.x() + i;
-					int gridY = startNode.y() + j;
-					int gridZ = startNode.z() + k;
+
+					// compute grid frame coordinates of this iter's node
+					int gridX = part.kernel->node0.x() + i;
+					int gridY = part.kernel->node0.y() + j;
+					int gridZ = part.kernel->node0.z() + k;
 
 					// skip if out of bounds
 					if (gridX < 0 || gridY < 0 || gridZ < 0
@@ -221,15 +191,8 @@ void SerialSolver::transferG2P(System& system, const SimParameters& parameters)
 						continue;
 					}
 
-					// TODO: consider storing this during P2G avoiding recompute
-					// compute weight N_ip (eq. 121)
-					double weight = part.w[i].x() * part.w[j].y() * part.w[k].z();
-
-					// compute weight gradient ∇N_ip (eq. after 124)'
-					Vector3d weightGradient = Vector3d(part.wGrad[i].x() * part.w[j].y() * part.w[k].z(),
-													   part.w[i].x() * part.wGrad[j].y() * part.w[k].z(),
-													   part.w[i].x() * part.w[j].y() * part.wGrad[k].z())
-						/ system.dx;
+					double   weight			= part.kernel->weight(i, j, k);
+					Vector3d weightGradient = part.kernel->weightGradient(i, j, k);
 
 					// reference to node
 					Node& node = system.nodes_[gridX][gridY][gridZ];
@@ -238,13 +201,13 @@ void SerialSolver::transferG2P(System& system, const SimParameters& parameters)
 					part.vel += weight * node.vel;
 
 					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = (Vector3d(i, j, k) - vecIPBase) * system.dx;
+					Vector3d vecPI = part.kernel->vecPI(i, j, k) * system.dx;
 
 					// acculumate affine state B_i (eq 176)
 					part.B += weight * node.vel * vecPI.transpose();
 
 					// accumulate node's deformation update (eq 181)
-					part.velocityGradient += node.vel * weightGradient.transpose();
+					part.velGradient += node.vel * weightGradient.transpose();
 				}
 			}
 		}
@@ -258,17 +221,10 @@ void SerialSolver::computeParticle(System& system, const SimParameters& paramete
 		part.pos += parameters.timestep * part.vel;
 
 		// compute updated elastic deformation gradient F_E_Tilda (eq 181 and paragraph above eq 80)
-		Matrix3d F_E_Tilda = (Matrix3d::Identity() + parameters.timestep * part.velocityGradient) * part.F;
+		Matrix3d F_E_Tilda = (Matrix3d::Identity() + parameters.timestep * part.velGradient) * part.F_E;
 
 		// compute updated deformation gradient F (eq 80)
 		Matrix3d F = F_E_Tilda * part.F_P;
-
-		// Matrix3d U, sig, V;
-		// svd(F_E_Tilda, U, sig, V);
-		// for (int i = 0; i < 3; i++) {
-		// 	sig.row(i)[i] = std::max(sig.row(i)[i], 1.0 - parameters.criticalCompression);
-		// 	sig.row(i)[i] = std::min(sig.row(i)[i], 1.0 + parameters.criticalStretch);
-		// }
 
 		// SVD of F_E_Tilda (eq 83)
 		JacobiSVD<Matrix3d> svd(F_E_Tilda, ComputeFullU | ComputeFullV);
@@ -283,11 +239,11 @@ void SerialSolver::computeParticle(System& system, const SimParameters& paramete
 		}
 
 		// update part F (eq 84) and R (paragraph under eq 45)
-		part.F = U * Sig.asDiagonal() * V.transpose();
-		part.R = U * V.transpose();
+		part.F_E = U * Sig.asDiagonal() * V.transpose();
+		part.R_E = U * V.transpose();
 
 		// compute part F_P (eq 86) and its determinant J_P
-		part.F_P = part.F.inverse() * F;
-		part.Jp  = part.F_P.determinant();
+		part.F_P = part.F_E.inverse() * F;
+		part.J_P = part.F_P.determinant();
 	}
 }
