@@ -1,5 +1,7 @@
 #include "mpmHook.h"
+#include "solver/serialImplicitSolver.h"
 #include "solver/serialSolver.h"
+#include "solver/solver.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
@@ -10,11 +12,12 @@ MpmHook::MpmHook()
 	: PhysicsHook()
 	, ui_(renderSettings_, simParameters_, stats_, system_)
 {
-	double s = system_.boundary;	 // start
-	double e = 1 - system_.boundary; // end
-
 	// bounds
-	{ // x = L(eft) or R(ight)
+	{
+		double s = system_.boundary;	 // start
+		double e = 1 - system_.boundary; // end
+
+		// x = L(eft) or R(ight)
 		// y = D(own) or U(p)
 		// z = B(ack) or F(ront)
 		RowVector3d LDB(s, s, s);
@@ -59,22 +62,26 @@ void MpmHook::initSimulation()
 	system_.clear();
 	stats_.reset();
 
+	// solver
+	solver_ = new SerialSolver();
+	// solver_ = new SerialImplicitSolver();
+
 	// TODO Engineer process to modify at run time
 
-	// falling blocks
-	{
-		system_.addCube(Vector3d(0.5, 0.4, 0.5),
-						Vector3d(0, 0, 0),
-						RowVector3d(1, 0, 1));
+	// // falling blocks
+	// {
+	// 	system_.addCube(Vector3d(0.5, 0.4, 0.5),
+	// 					Vector3d(0, 0, 0),
+	// 					RowVector3d(1, 0, 1));
 
-		system_.addCube(Vector3d(0.4, 0.6, 0.5),
-						Vector3d(0, 0, 0),
-						RowVector3d(0, 1, 1));
+	// 	system_.addCube(Vector3d(0.4, 0.6, 0.5),
+	// 					Vector3d(0, 0, 0),
+	// 					RowVector3d(0, 1, 1));
 
-		system_.addCube(Vector3d(0.6, 0.8, 0.5),
-						  Vector3d(0, 0, 0),
-						  RowVector3d(0, 1, 0));
-	}
+	// 	system_.addCube(Vector3d(0.6, 0.8, 0.5),
+	// 					  Vector3d(0, 0, 0),
+	// 					  RowVector3d(0, 1, 0));
+	// }
 
 	// colliding blocks
 	// {
@@ -87,12 +94,12 @@ void MpmHook::initSimulation()
 	// 					RowVector3d(1, 0, 1));
 	// }
 
-	// // block to wall
-	// {
-	// 	system_.addCube(Vector3d(0.5, 0.7, 0.5),
-	// 					Vector3d(30, 0, 0),
-	// 					RowVector3d(0, 1, 0));
-	// }
+	// block to wall
+	{
+		system_.addCube(Vector3d(0.5, 0.7, 0.5),
+						Vector3d(30, 0, 0),
+						RowVector3d(0, 1, 0));
+	}
 }
 
 void MpmHook::tick()
@@ -101,7 +108,7 @@ void MpmHook::tick()
 
 bool MpmHook::simulateOneStep()
 {
-	SerialSolver::advance(system_, simParameters_, stats_);
+	solver_->advance(system_, simParameters_, stats_);
 
 	return false;
 }

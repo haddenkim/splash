@@ -7,6 +7,8 @@
 #include "state/system.h"
 #include <Eigen/Core>
 
+class Solver;
+
 class MpmHook : public PhysicsHook {
 public:
 	MpmHook();
@@ -36,6 +38,9 @@ public:
 
 	// simulation state
 	System system_;
+
+	// solver
+	Solver* solver_;
 
 	// settings + stats
 	SimParameters  simParameters_;
