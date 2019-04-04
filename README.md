@@ -19,6 +19,11 @@ Splash uses [libigl](https://libigl.github.io/) for rendering.
 Dependencies
 - [libigl](https://libigl.github.io/) and its dependencies (imgui, opengl)
 
+If not installed, simply clone https://github.com/libigl/libigl into this project's lib/ folder
+```
+cd lib
+git clone https://github.com/libigl/libigl.git
+```
 
 ### MacOS & Linux
 ```
