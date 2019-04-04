@@ -5,9 +5,15 @@ This program implements the material point method described in the [2016 SIGGRAP
 It also draws from details elaborated in [Stomakhin 2013](http://alexey.stomakhin.com/research/snow.html) and [Jiang 2015](https://www.seas.upenn.edu/~cffjiang/research/apic/paper.pdf).
 
 The purpose of this project is to first learn the core principles of the Material Point Method. 
-The second goal of this project is to learn and implement various parallel programming methods.
+The second goal of this project is to learn and implement various parallel programming methods. 
 
-Splash uses [libigl](https://libigl.github.io/) for rendering 
+Splash uses [libigl](https://libigl.github.io/) for rendering.
+
+## Features/TODO
+[x] Serial Explicit MPM
+[ ] Serial Implicit MPM
+[ ] OpenMP Implicit MPM
+[ ] MPI Implicit MPM
 
 ## Compiling
 Dependencies
