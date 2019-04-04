@@ -33,7 +33,7 @@ I tested compiling with GCC 7.3 on Ubuntu 18.
 Untested. 
 
 ## Usage
-From the binary directory,
+From the binary directory (build/bin/)
 ```
 ./splash
 ```
