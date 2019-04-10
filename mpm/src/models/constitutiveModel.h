@@ -14,16 +14,6 @@ public:
 					  double E0		= 1e4,	// E_0 initial Young's Modulus
 					  double nu		= 0.2);		  // ν Poisson ratiou
 
-	// computes the needed deformation gradient decompositions without modifying input F_E and F_P (curr)
-	void computeDeformDecomp(Eigen::Matrix3d&		F_E,
-							 Eigen::Matrix3d&		R_E,
-							 Eigen::Matrix3d&		F_P,
-							 double&				J_P,
-							 const Eigen::Matrix3d& F_E_curr,
-							 const Eigen::Matrix3d& F_P_curr,
-							 const Eigen::Matrix3d& velGradient,
-							 const double&			timestep);
-
 	// computes and updates the needed deformation gradients
 	void updateDeformDecomp(Eigen::Matrix3d&	   F_E,
 							Eigen::Matrix3d&	   R_E,

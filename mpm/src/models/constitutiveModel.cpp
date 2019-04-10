@@ -17,20 +17,18 @@ ConstitutiveModel::ConstitutiveModel(double thetaC,
 	lambda0_ = E0 * nu / ((1 + nu) * (1 - 2 * nu));
 }
 
-void ConstitutiveModel::computeDeformDecomp(Eigen::Matrix3d&	   F_E,
-											Eigen::Matrix3d&	   R_E,
-											Eigen::Matrix3d&	   F_P,
-											double&				   J_P,
-											const Eigen::Matrix3d& F_E_curr,
-											const Eigen::Matrix3d& F_P_curr,
-											const Eigen::Matrix3d& velGradient,
-											const double&		   timestep)
+void ConstitutiveModel::updateDeformDecomp(Eigen::Matrix3d&		  F_E,
+										   Eigen::Matrix3d&		  R_E,
+										   Eigen::Matrix3d&		  F_P,
+										   double&				  J_P,
+										   const Eigen::Matrix3d& velGradient,
+										   const double&		  timestep)
 {
 	// compute updated elastic deformation gradient F_E_Tilda (eq 181 and paragraph above eq 80)
-	Matrix3d F_E_Tilda = (Matrix3d::Identity() + timestep * velGradient) * F_E_curr;
+	Matrix3d F_E_Tilda = (Matrix3d::Identity() + timestep * velGradient) * F_E;
 
 	// compute updated deformation gradient F (eq 80)
-	Matrix3d F = F_E_Tilda * F_P_curr;
+	Matrix3d F = F_E_Tilda * F_P;
 
 	// SVD of F_E_Tilda (eq 83)
 	JacobiSVD<Matrix3d> svd(F_E_Tilda, ComputeFullU | ComputeFullV);
@@ -51,17 +49,6 @@ void ConstitutiveModel::computeDeformDecomp(Eigen::Matrix3d&	   F_E,
 	// compute part F_P (eq 86) and its determinant J_P
 	F_P = F_E.inverse() * F;
 	J_P = F_P.determinant();
-}
-
-void ConstitutiveModel::updateDeformDecomp(Eigen::Matrix3d&		  F_E,
-										   Eigen::Matrix3d&		  R_E,
-										   Eigen::Matrix3d&		  F_P,
-										   double&				  J_P,
-										   const Eigen::Matrix3d& velGradient,
-										   const double&		  timestep)
-{
-
-	computeDeformDecomp(F_E, R_E, F_P, J_P, F_E, F_P, velGradient, timestep);
 }
 
 Eigen::Matrix3d ConstitutiveModel::computeFirstPiolaKirchoff(const Eigen::Matrix3d& F_E,
