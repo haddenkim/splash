@@ -36,8 +36,10 @@ struct Particle {
 	double			J_P; // determinant of the plastic deformation gradient
 
 	// time integration bookkeeping
-	Interpolation* kernel;
+	Interpolation kernel;
 
 	Eigen::Matrix3d VPFT;		 // V_p * P(F_p) * (F_p)^T (eq 189)
 	Eigen::Matrix3d velGradient; // accumulation of ∇v_p = Σ_i(v_i * ∇w_ip) (eq 181) (stomakhin step 7)
+
+	Eigen::Matrix3d F_E_hat; // estimated F̂_E
 };

@@ -30,9 +30,9 @@ void SerialSolver::advance(System& system, const SimParameters parameters, Stats
 
 void SerialSolver::resetGrid(System& system)
 {
-	for (int i = 0; i < system.gridSize; i++) {
-		for (int j = 0; j < system.gridSize; j++) {
-			for (int k = 0; k < system.gridSize; k++) {
+	for (int i = 0; i < system.gridSize_; i++) {
+		for (int j = 0; j < system.gridSize_; j++) {
+			for (int k = 0; k < system.gridSize_; k++) {
 				// reference to node
 				Node& node = system.nodes_[i][j][k];
 
@@ -56,12 +56,13 @@ void SerialSolver::resetGrid(System& system)
 void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 {
 	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-	double commonDInvScalar = Interpolation::DInverseScalar(system.dx);
+	double commonDInvScalar = Interpolation::DInverseScalar(system.dx_);
 
 	for (Particle& part : system.particles_) {
 
 		// compute the particle's kernel
-		part.kernel = new Interpolation(part.pos, system.dx);
+		Interpolation& kernel = part.kernel;
+		kernel.compute(part.pos, system.dx_);
 
 		// loop through kernel nodes
 		for (int i = 0; i < 3; i++) {
@@ -69,18 +70,18 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 				for (int k = 0; k < 3; k++) {
 
 					// compute grid frame coordinates of this iter's node
-					int gridX = part.kernel->node0.x() + i;
-					int gridY = part.kernel->node0.y() + j;
-					int gridZ = part.kernel->node0.z() + k;
+					int gridX = kernel.node0.x() + i;
+					int gridY = kernel.node0.y() + j;
+					int gridZ = kernel.node0.z() + k;
 
 					// skip if out of bounds
 					if (gridX < 0 || gridY < 0 || gridZ < 0
-						|| gridX > system.gridSize || gridY > system.gridSize || gridZ > system.gridSize) {
+						|| gridX > system.gridSize_ || gridY > system.gridSize_ || gridZ > system.gridSize_) {
 						continue;
 					}
 
-					double   weight			= part.kernel->weight(i, j, k);
-					Vector3d weightGradient = part.kernel->weightGradient(i, j, k);
+					double   weight			= kernel.weight(i, j, k);
+					Vector3d weightGradient = kernel.weightGradient(i, j, k);
 
 					// reference to node
 					Node& node = system.nodes_[gridX][gridY][gridZ];
@@ -89,7 +90,7 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 					node.mass += weight * part.mass;
 
 					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = part.kernel->vecPI(i, j, k) * system.dx;
+					Vector3d vecPI = kernel.vecPI(i, j, k) * system.dx_;
 
 					// accumulate momentum (eq. 173)
 					// stores in node velocity, next mpm step computes velocity from momentum
@@ -113,7 +114,7 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 		// compute determinant of elastic deformation gradient J_E
 		double J_E = part.F_E.determinant();
 
-		// compute first Piola-Kirchoff Stresss P (eq 52) * F^T
+		// compute first Piola-Kirchoff Stress P (eq 52) * F^T
 		Matrix3d PFT = 2 * mu * (part.F_E - part.R_E) * part.F_E.transpose() + (lambda * (J_E - 1) * J_E) * Matrix3d::Identity();
 
 		// compute the per part constant contribution to nodal elastic force V_p * P_p * (F_p)^T (eq 189)
@@ -124,9 +125,9 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 void SerialSolver::computeGrid(System& system, const SimParameters& parameters)
 {
 	// loop through all nodes
-	for (int i = 0; i < system.gridSize; i++) {
-		for (int j = 0; j < system.gridSize; j++) {
-			for (int k = 0; k < system.gridSize; k++) {
+	for (int i = 0; i < system.gridSize_; i++) {
+		for (int j = 0; j < system.gridSize_; j++) {
+			for (int k = 0; k < system.gridSize_; k++) {
 
 				// reference to node
 				Node& node = system.nodes_[i][j][k];
@@ -158,22 +159,22 @@ void SerialSolver::computeGrid(System& system, const SimParameters& parameters)
 
 				// enforce boundary conditions
 				// node's position  in world space
-				Vector3d worldPos = Vector3d(i, j, k) * system.dx;
+				Vector3d worldPos = Vector3d(i, j, k) * system.dx_;
 
 				// TODO: implement additional boundary conditions
-				// TODO: consider more sophisticated collision response (ex. coefficients of restitution)
+				// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
 
 				// non-elastic boundaries
-				if (worldPos.x() < system.boundary			 // left wall
-					|| worldPos.x() > 1 - system.boundary	// right wall
-					|| worldPos.y() > 1 - system.boundary	// top wall (ceiling)
-					|| worldPos.z() < system.boundary		 // back wall
-					|| worldPos.z() > 1 - system.boundary) { // front wall
+				if (worldPos.x() < system.boundary_			 // left wall
+					|| worldPos.x() > 1 - system.boundary_	// right wall
+					|| worldPos.y() > 1 - system.boundary_	// top wall (ceiling)
+					|| worldPos.z() < system.boundary_		 // back wall
+					|| worldPos.z() > 1 - system.boundary_) { // front wall
 					node.vel.setZero();
 				}
 
 				// elastic boundary
-				if (worldPos.y() < system.boundary) { // bottom wall (floor)
+				if (worldPos.y() < system.boundary_) { // bottom wall (floor)
 					node.vel.y() = std::max(0.0, node.vel.y());
 				}
 			}
@@ -190,24 +191,27 @@ void SerialSolver::transferG2P(System& system, const SimParameters& parameters)
 		part.vel.setZero();
 		part.B.setZero();
 
+		// reference to kernel
+		Interpolation& kernel = part.kernel;
+
 		// loop through kernel nodes
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {
 				for (int k = 0; k < 3; k++) {
 
 					// compute grid frame coordinates of this iter's node
-					int gridX = part.kernel->node0.x() + i;
-					int gridY = part.kernel->node0.y() + j;
-					int gridZ = part.kernel->node0.z() + k;
+					int gridX = kernel.node0.x() + i;
+					int gridY = kernel.node0.y() + j;
+					int gridZ = kernel.node0.z() + k;
 
 					// skip if out of bounds
 					if (gridX < 0 || gridY < 0 || gridZ < 0
-						|| gridX > system.gridSize || gridY > system.gridSize || gridZ > system.gridSize) {
+						|| gridX > system.gridSize_ || gridY > system.gridSize_ || gridZ > system.gridSize_) {
 						continue;
 					}
 
-					double   weight			= part.kernel->weight(i, j, k);
-					Vector3d weightGradient = part.kernel->weightGradient(i, j, k);
+					double   weight			= kernel.weight(i, j, k);
+					Vector3d weightGradient = kernel.weightGradient(i, j, k);
 
 					// reference to node
 					Node& node = system.nodes_[gridX][gridY][gridZ];
@@ -216,7 +220,7 @@ void SerialSolver::transferG2P(System& system, const SimParameters& parameters)
 					part.vel += weight * node.vel;
 
 					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = part.kernel->vecPI(i, j, k) * system.dx;
+					Vector3d vecPI = kernel.vecPI(i, j, k) * system.dx_;
 
 					// acculumate affine state B_i (eq 176)
 					part.B += weight * node.vel * vecPI.transpose();

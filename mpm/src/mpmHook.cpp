@@ -14,8 +14,8 @@ MpmHook::MpmHook()
 {
 	// bounds
 	{
-		double s = system_.boundary;	 // start
-		double e = 1 - system_.boundary; // end
+		double s = system_.boundary_;	 // start
+		double e = 1 - system_.boundary_; // end
 
 		// x = L(eft) or R(ight)
 		// y = D(own) or U(p)
@@ -53,15 +53,15 @@ MpmHook::MpmHook()
 
 	// grid nodes
 	{
-		int gsize = system_.gridSize * system_.gridSize * system_.gridSize;
+		int gsize = system_.gridSize_ * system_.gridSize_ * system_.gridSize_;
 		gridPositions_.resize(gsize, 3);
 		gridVelocities_.resize(gsize, 3);
 		gridForces_.resize(gsize, 3);
 
 		int gi = 0;
-		for (int i = 0; i < system_.gridSize; i++) {
-			for (int j = 0; j < system_.gridSize; j++) {
-				for (int k = 0; k < system_.gridSize; k++) {
+		for (int i = 0; i < system_.gridSize_; i++) {
+			for (int j = 0; j < system_.gridSize_; j++) {
+				for (int k = 0; k < system_.gridSize_; k++) {
 
 					Vector3d nodePosition			  = Vector3d(i, j, k);
 					gridPositions_.block<1, 3>(gi, 0) = nodePosition;
@@ -72,7 +72,7 @@ MpmHook::MpmHook()
 		}
 
 		// scale
-		gridPositions_ *= system_.dx;
+		gridPositions_ *= system_.dx_;
 	}
 }
 
@@ -169,9 +169,9 @@ void MpmHook::updateRenderGeometry()
 		// grid
 		{
 			int gi = 0;
-			for (int i = 0; i < system_.gridSize; i++) {
-				for (int j = 0; j < system_.gridSize; j++) {
-					for (int k = 0; k < system_.gridSize; k++) {
+			for (int i = 0; i < system_.gridSize_; i++) {
+				for (int j = 0; j < system_.gridSize_; j++) {
+					for (int k = 0; k < system_.gridSize_; k++) {
 						const Node& node = system_.nodes_[i][j][k];
 
 						gridVelocities_.block<1, 3>(gi, 0) = node.vel;

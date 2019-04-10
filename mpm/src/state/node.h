@@ -13,4 +13,6 @@ struct Node {
 	double						 mass;			  // mass
 	std::vector<Particle*>		 particles;		  // nearby particles that contibute to this node
 	std::vector<Eigen::Vector3d> weightGradients; // per particle
+
+	int activeNodeIndex; // index in the active node list
 };
