@@ -1,6 +1,7 @@
 #pragma once
 #include "state/node.h"
 #include "state/particle.h"
+#include "models/constitutiveModel.h"
 #include <vector>
 
 class System {
@@ -22,4 +23,7 @@ public:
 
 	// boundaries
 	double boundary_ = 0.05;
+
+	// particle modes
+	ConstitutiveModel constitutiveModel_;
 };

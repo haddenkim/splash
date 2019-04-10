@@ -4,6 +4,7 @@
 using namespace Eigen;
 
 System::System()
+	: constitutiveModel_()
 {
 }
 

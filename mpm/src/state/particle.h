@@ -9,8 +9,8 @@ struct Particle {
 		, color(color)
 	{
 		// TODO engineer way to vary these parameters or compute them (ex. FEM style eq 136-155)
-		mass = 1.0;
-		vol  = 1.0;
+		mass0 = 1.0;
+		vol0  = 1.0;
 
 		B.setZero();
 		F_E.setIdentity();
@@ -21,8 +21,8 @@ struct Particle {
 
 	// Time independent
 	Eigen::RowVector3d color; // rendering color
-	double			   mass;  // mass
-	double			   vol;   // volume
+	double			   mass0; // intial mass
+	double			   vol0;  // initial volume
 
 	// time dependent
 	Eigen::Vector3d pos; // position

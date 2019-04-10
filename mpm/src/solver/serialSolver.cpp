@@ -60,6 +60,9 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 
 	for (Particle& part : system.particles_) {
 
+		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
+		part.VPFT = system.constitutiveModel_.computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
+
 		// compute the particle's kernel
 		Interpolation& kernel = part.kernel;
 		kernel.compute(part.pos, system.dx_);
@@ -87,14 +90,14 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 					Node& node = system.nodes_[gridX][gridY][gridZ];
 
 					// accumulate mass (eq. 172)
-					node.mass += weight * part.mass;
+					node.mass += weight * part.mass0;
 
 					// compute vector from part to node in world frame (x_i - x_p)
 					Vector3d vecPI = kernel.vecPI(i, j, k) * system.dx_;
 
 					// accumulate momentum (eq. 173)
 					// stores in node velocity, next mpm step computes velocity from momentum
-					node.vel += weight * part.mass * (part.vel + part.B * commonDInvScalar * vecPI);
+					node.vel += weight * part.mass0 * (part.vel + part.B * commonDInvScalar * vecPI);
 
 					// store link to this part for convenience
 					node.particles.push_back(&part);
@@ -104,21 +107,6 @@ void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 				}
 			}
 		}
-
-		// for convenience / optimization, pre-compute part constant contribution to node force
-		// compute current mu and lambda (eq 87)
-		double exp	= std::exp(parameters.hardening * (1.0 - part.J_P));
-		double mu	 = parameters.mu0 * exp;
-		double lambda = parameters.lambda0 * exp;
-
-		// compute determinant of elastic deformation gradient J_E
-		double J_E = part.F_E.determinant();
-
-		// compute first Piola-Kirchoff Stress P (eq 52) * F^T
-		Matrix3d PFT = 2 * mu * (part.F_E - part.R_E) * part.F_E.transpose() + (lambda * (J_E - 1) * J_E) * Matrix3d::Identity();
-
-		// compute the per part constant contribution to nodal elastic force V_p * P_p * (F_p)^T (eq 189)
-		part.VPFT = part.vol * PFT;
 	}
 }
 
@@ -165,10 +153,10 @@ void SerialSolver::computeGrid(System& system, const SimParameters& parameters)
 				// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
 
 				// non-elastic boundaries
-				if (worldPos.x() < system.boundary_			 // left wall
+				if (worldPos.x() < system.boundary_			  // left wall
 					|| worldPos.x() > 1 - system.boundary_	// right wall
 					|| worldPos.y() > 1 - system.boundary_	// top wall (ceiling)
-					|| worldPos.z() < system.boundary_		 // back wall
+					|| worldPos.z() < system.boundary_		  // back wall
 					|| worldPos.z() > 1 - system.boundary_) { // front wall
 					node.vel.setZero();
 				}
@@ -236,33 +224,10 @@ void SerialSolver::transferG2P(System& system, const SimParameters& parameters)
 void SerialSolver::computeParticle(System& system, const SimParameters& parameters)
 {
 	for (Particle& part : system.particles_) {
+		// update particle deformation gradient components
+		system.constitutiveModel_.updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
+
 		// Advection
 		part.pos += parameters.timestep * part.vel;
-
-		// compute updated elastic deformation gradient F_E_Tilda (eq 181 and paragraph above eq 80)
-		Matrix3d F_E_Tilda = (Matrix3d::Identity() + parameters.timestep * part.velGradient) * part.F_E;
-
-		// compute updated deformation gradient F (eq 80)
-		Matrix3d F = F_E_Tilda * part.F_P;
-
-		// SVD of F_E_Tilda (eq 83)
-		JacobiSVD<Matrix3d> svd(F_E_Tilda, ComputeFullU | ComputeFullV);
-		Matrix3d			U   = svd.matrixU();		// U
-		Vector3d			Sig = svd.singularValues(); // Σ
-		Matrix3d			V   = svd.matrixV();		// V
-
-		// clamp singular values (eq 82)
-		for (int i = 0; i < 3; i++) {
-			Sig(i) = std::max(Sig(i), 1.0 - parameters.criticalCompression);
-			Sig(i) = std::min(Sig(i), 1.0 + parameters.criticalStretch);
-		}
-
-		// update part F (eq 84) and R (paragraph under eq 45)
-		part.F_E = U * Sig.asDiagonal() * V.transpose();
-		part.R_E = U * V.transpose();
-
-		// compute part F_P (eq 86) and its determinant J_P
-		part.F_P = part.F_E.inverse() * F;
-		part.J_P = part.F_P.determinant();
 	}
 }
