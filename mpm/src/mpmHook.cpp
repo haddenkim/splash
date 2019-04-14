@@ -1,4 +1,7 @@
 #include "mpmHook.h"
+#include "solver/serialImplicitSolver.h"
+#include "solver/serialSolver.h"
+#include "solver/ompSolver.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
@@ -10,6 +13,13 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	, ui_(renderSettings_, simParameters_, stats_, system_)
 	, initialShapes_(initialShapes)
 {
+	// available solvers
+	solvers_.emplace_back(new SerialSolver());
+	solvers_.emplace_back(new SerialImplicitSolver());
+
+	// TODO allow cmake to exclude ompSolver
+	solvers_.emplace_back(new OmpSolver());
+
 	// bounds
 	{
 		double s = system_.boundary_;	 // start
@@ -100,11 +110,7 @@ void MpmHook::tick()
 
 bool MpmHook::simulateOneStep()
 {
-	if (simParameters_.solveImplicit) {
-		serialImplicitSolver_.advance(system_, simParameters_, stats_);
-	} else {
-		serialExplicitSolver_.advance(system_, simParameters_, stats_);
-	}
+	solvers_[(int)simParameters_.solveMethod]->advance(system_, simParameters_, stats_);
 
 	renderNeedsUpdate_ = true;
 

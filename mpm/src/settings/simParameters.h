@@ -4,6 +4,8 @@ struct SimParameters {
 	SimParameters()
 	{
 		// default settings
+		solveMethod = SM_EXPLICIT;
+
 		timestep = 1e-4;
 
 		particlesPerObject = 10000;
@@ -11,11 +13,17 @@ struct SimParameters {
 		gravityEnabled = true;
 		gravityG	   = 200;
 
-		solveImplicit = true;
-
 		solveTolerance = 1e-4;
-		solveMaxIters = 5;
+		solveMaxIters  = 5;
 	};
+
+	enum SolveMethod {
+		SM_EXPLICIT,
+		SM_IMPLICIT,
+		SM_OPENMP
+	};
+
+	SolveMethod solveMethod;
 
 	float timestep;
 
@@ -25,7 +33,6 @@ struct SimParameters {
 	float gravityG;
 
 	// implicit solver parameters
-	bool   solveImplicit;   // false = explicit
 	int	solveMaxIters;   //
 	double solveTolerance;  // τ
 	double solveStepLength; // α

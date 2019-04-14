@@ -3,8 +3,6 @@
 #include "settings/renderSettings.h"
 #include "settings/simParameters.h"
 #include "settings/stats.h"
-#include "solver/serialImplicitSolver.h"
-#include "solver/serialSolver.h"
 #include "state/particle.h"
 #include "state/shape.h"
 #include "state/system.h"
@@ -50,8 +48,7 @@ public:
 	System			   system_;
 
 	// solvers
-	SerialSolver		 serialExplicitSolver_;
-	SerialImplicitSolver serialImplicitSolver_;
+	std::vector<Solver*> solvers_;
 
 	// settings + stats
 	SimParameters  simParameters_;
