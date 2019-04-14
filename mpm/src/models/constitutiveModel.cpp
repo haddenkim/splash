@@ -22,7 +22,7 @@ void ConstitutiveModel::updateDeformDecomp(Eigen::Matrix3d&		  F_E,
 										   Eigen::Matrix3d&		  F_P,
 										   double&				  J_P,
 										   const Eigen::Matrix3d& velGradient,
-										   const double&		  timestep)
+										   const double&		  timestep) const
 {
 	// compute updated elastic deformation gradient F_E_Tilda (eq 181 and paragraph above eq 80)
 	Matrix3d F_E_Tilda = (Matrix3d::Identity() + timestep * velGradient) * F_E;
@@ -53,7 +53,7 @@ void ConstitutiveModel::updateDeformDecomp(Eigen::Matrix3d&		  F_E,
 
 Eigen::Matrix3d ConstitutiveModel::computeFirstPiolaKirchoff(const Eigen::Matrix3d& F_E,
 															 const Eigen::Matrix3d& R_E,
-															 const double&			J_P)
+															 const double&			J_P) const
 {
 	// compute current mu and lambda (eq 87)
 	double mu;
@@ -70,7 +70,7 @@ Eigen::Matrix3d ConstitutiveModel::computeFirstPiolaKirchoff(const Eigen::Matrix
 Eigen::Matrix3d ConstitutiveModel::computeVolCauchyStress(const double&			 vol0,
 														  const Eigen::Matrix3d& F_E,
 														  const Eigen::Matrix3d& R_E,
-														  const double&			 J_P)
+														  const double&			 J_P) const
 {
 	// compute current mu and lambda (eq 87)
 	double mu;
@@ -89,7 +89,7 @@ Eigen::Matrix3d ConstitutiveModel::computeVolCauchyStress(const double&			 vol0,
 
 Eigen::MatrixXd ConstitutiveModel::computeFirstPiolaKirchoffDerivative(const Eigen::Matrix3d& F_E,
 																	   const Eigen::Matrix3d& R_E,
-																	   const double&		  J_P)
+																	   const double&		  J_P) const
 {
 	// compute current mu and lambda (eq 87)
 	double mu;
@@ -125,7 +125,7 @@ Eigen::MatrixXd ConstitutiveModel::computeFirstPiolaKirchoffDerivative(const Eig
 	return dP_dF;
 }
 
-void ConstitutiveModel::computeMuLambda(double& mu, double& lambda, const double& J_P)
+void ConstitutiveModel::computeMuLambda(double& mu, double& lambda, const double& J_P) const
 {
 	// compute current mu and lambda (eq 87)
 	double exp = std::exp(xi_ * (1.0 - J_P));
@@ -133,7 +133,7 @@ void ConstitutiveModel::computeMuLambda(double& mu, double& lambda, const double
 	lambda	 = lambda0_ * exp;
 }
 
-Eigen::Matrix2d ConstitutiveModel::computeB_ij(int i, int j, const Eigen::Vector3d& Sig, const Eigen::Vector3d& P_S)
+Eigen::Matrix2d ConstitutiveModel::computeB_ij(int i, int j, const Eigen::Vector3d& Sig, const Eigen::Vector3d& P_S) const
 {
 	// clamp B denominators (para after 77)
 	double denominatorL = std::max(Sig.coeff(i) - Sig.coeff( j), 1e-6);

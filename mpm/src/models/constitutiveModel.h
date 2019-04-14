@@ -20,28 +20,28 @@ public:
 							Eigen::Matrix3d&	   F_P,
 							double&				   J_P,
 							const Eigen::Matrix3d& velGradient,
-							const double&		   timestep);
+							const double&		   timestep) const;
 
 	// computes First Piola-Kirchoff Stress P
 	Eigen::Matrix3d computeFirstPiolaKirchoff(const Eigen::Matrix3d& F_E,
 											  const Eigen::Matrix3d& R_E,
-											  const double&			 J_P);
+											  const double&			 J_P) const;
 
 	// computes current volume * cauchy stress V_p * σ_p
 	Eigen::Matrix3d computeVolCauchyStress(const double&		  vol0,
 										   const Eigen::Matrix3d& F_E,
 										   const Eigen::Matrix3d& R_E,
-										   const double&		  J_P);
+										   const double&		  J_P) const;
 
 	// computes First Piola Kirchoff Differential δP
 	Eigen::MatrixXd computeFirstPiolaKirchoffDerivative(const Eigen::Matrix3d& F_E,
 														const Eigen::Matrix3d& R_E,
-														const double&		   J_P);
+														const double&		   J_P) const;
 
 private:
 	// helper functions
-	void			computeMuLambda(double& mu, double& lambda, const double& J_P);
-	Eigen::Matrix2d computeB_ij(int i, int j, const Eigen::Vector3d& Sig, const Eigen::Vector3d& P_S);
+	void			computeMuLambda(double& mu, double& lambda, const double& J_P) const;
+	Eigen::Matrix2d computeB_ij(int i, int j, const Eigen::Vector3d& Sig, const Eigen::Vector3d& P_S) const;
 
 	double thetaC_;  // θ_c critical compression
 	double thetaS_;  // θ_s critical stretch
