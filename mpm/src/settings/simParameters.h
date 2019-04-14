@@ -4,7 +4,7 @@ struct SimParameters {
 	SimParameters()
 	{
 		// default settings
-		solveMethod = SM_EXPLICIT;
+		solveMethod = SM_OPENMP;
 
 		timestep = 1e-4;
 
@@ -15,6 +15,9 @@ struct SimParameters {
 
 		solveTolerance = 1e-4;
 		solveMaxIters  = 5;
+		solveStepLength = 1;
+
+		numThreads = 4;
 	};
 
 	enum SolveMethod {
@@ -34,6 +37,10 @@ struct SimParameters {
 
 	// implicit solver parameters
 	int	solveMaxIters;   //
-	double solveTolerance;  // τ
-	double solveStepLength; // α
+	float solveTolerance;  // τ
+	float solveStepLength; // α
+
+	// OpenMP solver parameters
+	int numThreads;
+
 };
