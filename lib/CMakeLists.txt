@@ -1,4 +1,6 @@
 ## Dependencies
+set(libs )
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
 # libigl
@@ -22,7 +24,35 @@ option(LIBIGL_WITH_VIEWER            "Use OpenGL viewer"  ON)
 option(LIBIGL_WITH_XML               "Use XML"            OFF)
 
 find_package(LIBIGL REQUIRED QUIET)
+set(libs ${libs}  igl::core 
+                                igl::opengl_glfw  
+                                igl::opengl_glfw_imgui
+                                )
 
 # lodepng
 set (LODEPNG_DIR "lodepng")
 add_library(lodepng "${LODEPNG_DIR}/lodepng.cpp")
+set(libs ${libs}  lodepng)
+
+
+# OpenMP
+if(SOLVER_WITH_OPENMP)
+    find_package(OpenMP REQUIRED)
+	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    
+
+endif()
+
+# MPI
+if(SOLVER_WITH_MPI)
+    find_package(MPI REQUIRED)
+	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    
+    set(libs ${libs}  ${MPI_C_LIBRARIES})
+
+endif()
+
+# cache libs so that other subdirectory sees values
+set(splash_depends ${libs} CACHE INTERNAL "splash_depends")

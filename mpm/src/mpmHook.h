@@ -6,14 +6,16 @@
 #include "solver/serialImplicitSolver.h"
 #include "solver/serialSolver.h"
 #include "state/particle.h"
+#include "state/shape.h"
 #include "state/system.h"
 #include <Eigen/Core>
+#include <initializer_list>
 
 class Solver;
 
 class MpmHook : public PhysicsHook {
 public:
-	MpmHook();
+	MpmHook(std::initializer_list<Shape> initialShapes);
 
 	void drawGUI() override;
 
@@ -44,7 +46,8 @@ public:
 	Eigen::MatrixXd gridBorders_;
 
 	// simulation state
-	System system_;
+	std::vector<Shape> initialShapes_;
+	System			   system_;
 
 	// solvers
 	SerialSolver		 serialExplicitSolver_;
