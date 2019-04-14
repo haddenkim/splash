@@ -9,7 +9,7 @@ public:
 	System();
 
 	void clear();
-	void addCube(Eigen::Vector3d center, Eigen::Vector3d velocity, Eigen::RowVector3d color);
+	void addCube(int partCount, Eigen::Vector3d center, Eigen::Vector3d velocity, Eigen::RowVector3d color);
 
 	// grid dimensions
 	static const int gridSize_ = 51;				   // number of nodes in each dimension

@@ -8,12 +8,12 @@ struct Interpolation {
 	// compute the underlying kernel data
 	void compute(Eigen::Vector3d position, double dx);
 
-	// retrieve 
-	double weight(int i, int j, int k);
+	// retrieve
+	double weight(int i, int j, int k) const;
 
-	Eigen::Vector3d weightGradient(int i, int j, int k);
+	Eigen::Vector3d weightGradient(int i, int j, int k) const;
 
-	Eigen::Vector3d vecPI(int i, int j, int k);
+	Eigen::Vector3d vecPI(int i, int j, int k) const;
 
 	static double DInverseScalar(double dx);
 

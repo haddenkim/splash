@@ -42,4 +42,5 @@ struct Particle {
 	Eigen::Matrix3d velGradient; // accumulation of ∇v_p = Σ_i(v_i * ∇w_ip) (eq 181) (stomakhin step 7)
 
 	Eigen::Matrix3d F_E_hat; // estimated F̂_E
+	Eigen::MatrixXd VdP_dF;   // Vol * ∂P/∂F
 };

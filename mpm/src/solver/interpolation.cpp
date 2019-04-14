@@ -34,7 +34,7 @@ void Interpolation::compute(Eigen::Vector3d position, double dx)
 	wGrad_H[2] = (vecI0P.array() - 0.5) / dx;		   // end node
 }
 
-double Interpolation::weight(int i, int j, int k)
+double Interpolation::weight(int i, int j, int k) const
 {
 	// TODO consider storing these 9 values at P2G to avoid recompute during G2P
 
@@ -42,7 +42,7 @@ double Interpolation::weight(int i, int j, int k)
 	return w[i].x() * w[j].y() * w[k].z();
 }
 
-Eigen::Vector3d Interpolation::weightGradient(int i, int j, int k)
+Eigen::Vector3d Interpolation::weightGradient(int i, int j, int k) const
 {
 	// TODO consider storing these 9 values at P2G to avoid recompute during G2P
 
@@ -52,7 +52,7 @@ Eigen::Vector3d Interpolation::weightGradient(int i, int j, int k)
 						   w[i].x() * w[j].y() * wGrad_H[k].z());
 }
 
-Eigen::Vector3d Interpolation::vecPI(int i, int j, int k)
+Eigen::Vector3d Interpolation::vecPI(int i, int j, int k) const
 {
 	// compute vector from part to node in grid frame (x_i - x_p) / dx
 	return Eigen::Vector3d(i, j, k) - vecI0P;

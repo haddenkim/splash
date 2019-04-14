@@ -1,7 +1,4 @@
 #include "mpmHook.h"
-#include "solver/serialImplicitSolver.h"
-#include "solver/serialSolver.h"
-#include "solver/solver.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
@@ -86,10 +83,6 @@ void MpmHook::initSimulation()
 	system_.clear();
 	stats_.reset();
 
-	// solver
-	solver_ = new SerialSolver();
-	// solver_ = new SerialImplicitSolver();
-
 	// TODO Engineer process to modify at run time
 
 	// // falling blocks
@@ -109,11 +102,13 @@ void MpmHook::initSimulation()
 
 	// colliding blocks
 	{
-		system_.addCube(Vector3d(0.2, 0.8, 0.2),
+		system_.addCube(simParameters_.particlesPerObject,
+						Vector3d(0.2, 0.8, 0.2),
 						Vector3d(10, 0, 10),
 						RowVector3d(0, 1, 1));
 
-		system_.addCube(Vector3d(0.8, 0.7, 0.5),
+		system_.addCube(simParameters_.particlesPerObject,
+						Vector3d(0.8, 0.7, 0.5),
 						Vector3d(-10, 0, 0),
 						RowVector3d(1, 0, 1));
 	}
@@ -134,7 +129,11 @@ void MpmHook::tick()
 
 bool MpmHook::simulateOneStep()
 {
-	solver_->advance(system_, simParameters_, stats_);
+	if (simParameters_.solveImplicit) {
+		serialImplicitSolver_.advance(system_, simParameters_, stats_);
+	} else {
+		serialExplicitSolver_.advance(system_, simParameters_, stats_);
+	}
 
 	renderNeedsUpdate_ = true;
 

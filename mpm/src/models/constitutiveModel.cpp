@@ -56,9 +56,9 @@ Eigen::Matrix3d ConstitutiveModel::computeFirstPiolaKirchoff(const Eigen::Matrix
 															 const double&			J_P)
 {
 	// compute current mu and lambda (eq 87)
-	double exp	= std::exp(xi_ * (1.0 - J_P));
-	double mu	 = mu0_ * exp;
-	double lambda = lambda0_ * exp;
+	double mu;
+	double lambda;
+	computeMuLambda(mu, lambda, J_P);
 
 	// compute determinant of elastic deformation gradient J_E
 	double J_E = F_E.determinant();
@@ -73,9 +73,9 @@ Eigen::Matrix3d ConstitutiveModel::computeVolCauchyStress(const double&			 vol0,
 														  const double&			 J_P)
 {
 	// compute current mu and lambda (eq 87)
-	double exp	= std::exp(xi_ * (1.0 - J_P));
-	double mu	 = mu0_ * exp;
-	double lambda = lambda0_ * exp;
+	double mu;
+	double lambda;
+	computeMuLambda(mu, lambda, J_P);
 
 	// compute determinant of elastic deformation gradient J_E
 	double J_E = F_E.determinant();
@@ -85,4 +85,64 @@ Eigen::Matrix3d ConstitutiveModel::computeVolCauchyStress(const double&			 vol0,
 	Matrix3d PFT = 2 * mu * (F_E - R_E) * F_E.transpose() + (lambda * (J_E - 1) * J_E) * Matrix3d::Identity();
 
 	return vol0 * PFT;
+}
+
+Eigen::MatrixXd ConstitutiveModel::computeFirstPiolaKirchoffDerivative(const Eigen::Matrix3d& F_E,
+																	   const Eigen::Matrix3d& R_E,
+																	   const double&		  J_P)
+{
+	// compute current mu and lambda (eq 87)
+	double mu;
+	double lambda;
+	computeMuLambda(mu, lambda, J_P);
+
+	// compute U Σ V^T from svd F
+	JacobiSVD<Matrix3d> svd(F_E, ComputeFullU | ComputeFullV);
+	Matrix3d			U   = svd.matrixU();		// U
+	Vector3d			Sig = svd.singularValues(); // Σ
+	Matrix3d			V   = svd.matrixV();		// V
+
+	double   J_S	= Sig.prod();			 // det(Σ)
+	Vector3d SigInv = Sig.array().inverse(); // Σ^-1
+
+	// compute P(Σ) aka ∂Ψ̂ /∂σ (sentence after eq 63)
+	//   P(Σ) = μ(Σ - I) + λ(J_S -1)(J_S)Σ^-1
+	Vector3d P_S = mu * (Sig.array() - 1).matrix() + lambda * (J_S - 1) * J_S * SigInv;
+
+	// compute ∂2Ψ/∂2σ aka A (eq 75)
+	//   ∂P̂/∂Σ = μ(∂Σ/∂Σ) + λ(J - 1)J (∂Σ^-1/∂Σ) + λ(2J - 1)(∂J/∂Σ)Σ^-1
+	//   ∂P̂/∂Σ = (μ + λ(J - 1)J)I + λ(2J - 1)(∂J/∂Σ)Σ^-1
+	Matrix3d dP_dSig = (mu * lambda * (J_S - 1) * J_S) * Matrix3d::Identity() + lambda * (2 * J_S - 1) * (J_S * SigInv * SigInv.transpose());
+
+	//  construct ∂P/∂F (para above 75 )
+	MatrixXd dP_dF(9, 9);
+	dP_dF.setZero();
+	dP_dF.block<3, 3>(0, 0) = dP_dSig;
+	dP_dF.block<2, 2>(3, 3) = computeB_ij(1, 2, Sig, P_S);
+	dP_dF.block<2, 2>(5, 5) = computeB_ij(1, 3, Sig, P_S);
+	dP_dF.block<2, 2>(7, 7) = computeB_ij(2, 3, Sig, P_S);
+
+	return dP_dF;
+}
+
+void ConstitutiveModel::computeMuLambda(double& mu, double& lambda, const double& J_P)
+{
+	// compute current mu and lambda (eq 87)
+	double exp = std::exp(xi_ * (1.0 - J_P));
+	mu		   = mu0_ * exp;
+	lambda	 = lambda0_ * exp;
+}
+
+Eigen::Matrix2d ConstitutiveModel::computeB_ij(int i, int j, const Eigen::Vector3d& Sig, const Eigen::Vector3d& P_S)
+{
+	// clamp B denominators (para after 77)
+	double denominatorL = std::max(Sig.coeff(i) - Sig.coeff( j), 1e-6);
+	double denominatorR = std::max(Sig.coeff(i) + Sig.coeff( j), 1e-6);
+
+	// compute B (eq 77)
+	Matrix2d mR;
+	mR << 1, -1, -1, 1;
+
+	return 0.5 * (P_S.coeff(i) - P_S.coeff(j)) / denominatorL * Matrix2d::Ones()
+		+ 0.5 * (P_S.coeff(i) + P_S.coeff(j)) / denominatorR * mR;
 }

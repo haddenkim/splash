@@ -3,6 +3,8 @@
 #include "settings/renderSettings.h"
 #include "settings/simParameters.h"
 #include "settings/stats.h"
+#include "solver/serialImplicitSolver.h"
+#include "solver/serialSolver.h"
 #include "state/particle.h"
 #include "state/system.h"
 #include <Eigen/Core>
@@ -30,7 +32,7 @@ public:
 	void writePNG(igl::opengl::glfw::Viewer& viewer);
 
 	// libigl render data
-	bool renderNeedsUpdate_;
+	bool			renderNeedsUpdate_;
 	Eigen::MatrixXd particlePositions_;
 	Eigen::MatrixXd particleColors_;
 	Eigen::MatrixXd particleVelocities_;
@@ -44,8 +46,9 @@ public:
 	// simulation state
 	System system_;
 
-	// solver
-	Solver* solver_;
+	// solvers
+	SerialSolver		 serialExplicitSolver_;
+	SerialImplicitSolver serialImplicitSolver_;
 
 	// settings + stats
 	SimParameters  simParameters_;
