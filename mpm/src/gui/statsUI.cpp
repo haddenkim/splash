@@ -20,7 +20,7 @@ void StatsUI::draw()
 	Text("Sim time: %0.4f", stats_.simTime);
 
 	ImGui::NewLine();
-	Text("Execution time (microseconds) of last step\n");
+	Text("Execution time (ms) of last step\n");
 	Columns(2);
 
 	Text("Reset Grid");
