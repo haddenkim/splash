@@ -12,7 +12,7 @@ UI::UI(RenderSettings& renderSettings,
 {
 	showParameters_ = true;
 	showRender_		= false;
-	showStats_		= false;
+	showStats_		= true;
 	showSystem_		= false;
 }
 

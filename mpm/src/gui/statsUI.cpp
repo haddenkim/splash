@@ -25,27 +25,28 @@ void StatsUI::draw()
 
 	Text("Reset Grid");
 	NextColumn();
-	Text("%i", stats_.timeReset);
+	Text("%10i . %03i", stats_.timeReset / 1000, stats_.timeReset % 1000);
+
 	NextColumn();
 
 	Text("P2G");
 	NextColumn();
-	Text("%i", stats_.timeP2G);
+	Text("%10i . %03i", stats_.timeP2G / 1000, stats_.timeP2G % 1000);
 	NextColumn();
 
 	Text("Grid Dynamics");
 	NextColumn();
-	Text("%i", stats_.timeGrid);
+	Text("%10i . %03i", stats_.timeGrid / 1000, stats_.timeGrid % 1000);
 	NextColumn();
 
 	Text("P2G");
 	NextColumn();
-	Text("%i", stats_.timeG2P);
+	Text("%10i . %03i", stats_.timeG2P / 1000, stats_.timeG2P % 1000);
 	NextColumn();
 
 	Text("Particle Update");
 	NextColumn();
-	Text("%i", stats_.timePart);
+	Text("%10i . %03i", stats_.timePart / 1000, stats_.timePart % 1000);
 	NextColumn();
 
 	Columns(1);
