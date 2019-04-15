@@ -9,5 +9,5 @@ class Solver {
 public:
 	virtual void advance(System& system, const SimParameters parameters, Stats& stats) = 0;
 
-	void clock(int& current, int& total, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds>& start);
+	void clock(unsigned int& current, unsigned int& total, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds>& start);
 };

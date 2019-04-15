@@ -1,30 +1,34 @@
 #pragma once
 
 struct Stats {
-	Stats()
-	{
-	};
+	Stats(){};
 
 	void reset()
 	{
 		stepCount = 0;
 		simTime   = 0.f;
+
+		totTimeReset = 0;
+		totTimeP2G = 0;
+		totTimeGrid = 0;
+		totTimeG2P = 0;
+		totTimePart = 0;
 	}
 
 	int   stepCount;
 	float simTime;
 
 	// time of last step
-	int timeReset;
-	int timeP2G;
-	int timeGrid;
-	int timeG2P;
-	int timePart;
+	unsigned int timeReset;
+	unsigned int timeP2G;
+	unsigned int timeGrid;
+	unsigned int timeG2P;
+	unsigned int timePart;
 
 	// total time of step
-	int totTimeReset;
-	int totTimeP2G;
-	int totTimeGrid;
-	int totTimeG2P;
-	int totTimePart;
+	unsigned int totTimeReset;
+	unsigned int totTimeP2G;
+	unsigned int totTimeGrid;
+	unsigned int totTimeG2P;
+	unsigned int totTimePart;
 };
