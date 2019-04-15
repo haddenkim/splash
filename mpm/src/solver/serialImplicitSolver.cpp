@@ -2,28 +2,9 @@
 
 using namespace Eigen;
 
-void SerialImplicitSolver::advance(System& system, const SimParameters parameters, Stats& stats)
+SerialImplicitSolver::SerialImplicitSolver()
 {
-	auto start = std::chrono::high_resolution_clock::now();
-
-	resetGrid(system);
-	clock(stats.timeReset, stats.totTimeReset, start);
-
-	transferP2G(system, parameters);
-	clock(stats.timeP2G, stats.totTimeP2G, start);
-
-	computeGrid(system, parameters);
-	clock(stats.timeGrid, stats.totTimeGrid, start);
-
-	transferG2P(system, parameters);
-	clock(stats.timeG2P, stats.totTimeG2P, start);
-
-	computeParticle(system, parameters);
-	clock(stats.timePart, stats.totTimePart, start);
-
-	// log stats
-	stats.simTime += parameters.timestep;
-	stats.stepCount++;
+	name_ = "Serial Implicit";
 }
 
 void SerialImplicitSolver::resetGrid(System& system)
@@ -60,90 +41,9 @@ void SerialImplicitSolver::resetGrid(System& system)
 	}
 }
 
-void SerialImplicitSolver::transferP2G(System& system, const SimParameters& parameters)
-{
-	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-	double commonDInvScalar = Interpolation::DInverseScalar(system.dx_);
-
-	for (Particle& part : system.particles_) {
-
-		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
-		part.VPFT = system.constitutiveModel_.computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
-
-		// compute the particle's kernel
-		Interpolation& kernel = part.kernel;
-		kernel.compute(part.pos, system.dx_);
-
-		// loop through kernel nodes
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				for (int k = 0; k < 3; k++) {
-
-					// compute grid frame coordinates of this iter's node
-					int gridX = kernel.node0.x() + i;
-					int gridY = kernel.node0.y() + j;
-					int gridZ = kernel.node0.z() + k;
-
-					// skip if out of bounds
-					if (gridX < 0 || gridY < 0 || gridZ < 0
-						|| gridX > system.gridSize_ || gridY > system.gridSize_ || gridZ > system.gridSize_) {
-						continue;
-					}
-
-					double   weight			= kernel.weight(i, j, k);
-					Vector3d weightGradient = kernel.weightGradient(i, j, k);
-
-					// reference to node
-					Node& node = system.nodes_[gridX][gridY][gridZ];
-
-					// accumulate mass (eq. 172)
-					node.mass += weight * part.mass0;
-
-					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = kernel.vecPI(i, j, k) * system.dx_;
-
-					// accumulate momentum (eq. 173)
-					// stores in node velocity, next mpm step computes velocity from momentum
-					node.vel += weight * part.mass0 * (part.vel + part.B * commonDInvScalar * vecPI);
-
-					// store link to this part for convenience
-					node.particles.push_back(&part);
-
-					// store in node
-					node.weightGradients.push_back(weightGradient);
-				}
-			}
-		}
-	}
-}
-
 void SerialImplicitSolver::computeGrid(System& system, const SimParameters& parameters)
 {
-	// produce list of active nodes for reduced DoF solves
-	for (int i = 0; i < system.gridSize_; i++) {
-		for (int j = 0; j < system.gridSize_; j++) {
-			for (int k = 0; k < system.gridSize_; k++) {
-
-				// reference to node
-				Node& node = system.nodes_[i][j][k];
-
-				// skip if node has no mass (aka no particles nearby)
-				if (node.mass == 0) {
-					continue;
-				}
-
-				// compute velocity from momentum / mass
-				node.vel /= node.mass;
-
-				// update node record
-				node.activeNodeIndex = activeNodes_.size();
-
-				// add to active node list
-				activeNodes_.push_back(&node);
-				activeNodeIndex_.emplace_back(Vector3i(i, j, k));
-			}
-		}
-	}
+	updateActiveNodeList(system);
 
 	// resize implicit solve data
 	int dof = activeNodes_.size() * 3; // 3 dimension
@@ -169,7 +69,7 @@ void SerialImplicitSolver::computeGrid(System& system, const SimParameters& para
 		nodeDisHat_ = nodeVelHat_ * parameters.timestep;
 
 		// compute system's energy gradient
-		// **root finding (eq 200)
+		// **root finding h (eq 200)
 		computeParticleValues(system, parameters);
 		computeEnergyGradient(system, parameters);
 
@@ -179,15 +79,15 @@ void SerialImplicitSolver::computeGrid(System& system, const SimParameters& para
 			break;
 		}
 
-		// ** root finding ∂h/∂v (eq 201)
+		// computes ∂f/∂v
 		computeHessian(system, parameters);
 
-		// ** root finding adjustments (eq 200)
-		// above computes ∂f/∂v
-		SparseMatrix<double> mass(dof,dof);
+		// ** root finding ∂h/∂v (eq 200)
+		SparseMatrix<double> mass(dof, dof);
 		mass.setIdentity();
 		hessian_ = mass + parameters.timestep * parameters.timestep * hessian_;
 
+		// ** root finding Δv (eq 201)
 		// solve for delta
 		SparseQR<SparseMatrix<double>, COLAMDOrdering<int>> solver;
 		solver.compute(hessian_);
@@ -207,68 +107,56 @@ void SerialImplicitSolver::computeGrid(System& system, const SimParameters& para
 		Node& node = *activeNodes_[ani];
 
 		node.vel = nodeVelHat_.segment<3>(3 * ani);
-	}
-}
 
-void SerialImplicitSolver::transferG2P(System& system, const SimParameters& parameters)
-{
-	// loop through part
-	for (Particle& part : system.particles_) {
+		// enforce boundary conditions
+		// node's position  in world space
+		Vector3d worldPos = activeNodeIndex_[node.activeNodeIndex].cast<double>() * system.dx_;
 
-		// reset velocity v_p and affine state B_p
-		part.vel.setZero();
-		part.B.setZero();
+		// TODO: implement additional boundary conditions
+		// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
 
-		// reference to kernel
-		Interpolation& kernel = part.kernel;
+		// non-elastic boundaries
+		if (worldPos.x() < system.boundary_			  // left wall
+			|| worldPos.x() > 1 - system.boundary_	// right wall
+			|| worldPos.y() > 1 - system.boundary_	// top wall (ceiling)
+			|| worldPos.z() < system.boundary_		  // back wall
+			|| worldPos.z() > 1 - system.boundary_) { // front wall
+			node.vel.setZero();
+		}
 
-		// loop through kernel nodes
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				for (int k = 0; k < 3; k++) {
-
-					// compute grid frame coordinates of this iter's node
-					int gridX = kernel.node0.x() + i;
-					int gridY = kernel.node0.y() + j;
-					int gridZ = kernel.node0.z() + k;
-
-					// skip if out of bounds
-					if (gridX < 0 || gridY < 0 || gridZ < 0
-						|| gridX > system.gridSize_ || gridY > system.gridSize_ || gridZ > system.gridSize_) {
-						continue;
-					}
-
-					double   weight			= kernel.weight(i, j, k);
-					Vector3d weightGradient = kernel.weightGradient(i, j, k);
-
-					// reference to node
-					Node& node = system.nodes_[gridX][gridY][gridZ];
-
-					// accumulate velocity v_i (eq 175)
-					part.vel += weight * node.vel;
-
-					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = kernel.vecPI(i, j, k) * system.dx_;
-
-					// acculumate affine state B_i (eq 176)
-					part.B += weight * node.vel * vecPI.transpose();
-
-					// accumulate node's deformation update (eq 181)
-					part.velGradient += node.vel * weightGradient.transpose();
-				}
-			}
+		// elastic boundary
+		if (worldPos.y() < system.boundary_) { // bottom wall (floor)
+			node.vel.y() = std::max(0.0, node.vel.y());
 		}
 	}
 }
 
-void SerialImplicitSolver::computeParticle(System& system, const SimParameters& parameters)
+void SerialImplicitSolver::updateActiveNodeList(System& system)
 {
-	for (Particle& part : system.particles_) {
-		// update particle deformation gradient components
-		system.constitutiveModel_.updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
+	// produce list of active nodes for reduced DoF solves
+	for (int i = 0; i < system.gridSize_; i++) {
+		for (int j = 0; j < system.gridSize_; j++) {
+			for (int k = 0; k < system.gridSize_; k++) {
 
-		// Advection
-		part.pos += parameters.timestep * part.vel;
+				// reference to node
+				Node& node = system.nodes_[i][j][k];
+
+				// skip if node has no mass (aka no particles nearby)
+				if (node.mass == 0) {
+					continue;
+				}
+
+				// compute velocity from momentum / mass
+				node.vel /= node.mass;
+
+				// update node record
+				node.activeNodeIndex = activeNodes_.size();
+
+				// add to active node list
+				activeNodes_.push_back(&node);
+				activeNodeIndex_.emplace_back(Vector3i(i, j, k));
+			}
+		}
 	}
 }
 
@@ -296,12 +184,20 @@ void SerialImplicitSolver::computeParticleValues(System& system, const SimParame
 						continue;
 					}
 
+					// skip if weight is zero
+					if(kernel.weight(i,j,k) == 0)
+					{
+						continue;
+					}
+
 					// retrieve this node's weight gradient ∇w_ip
 					Vector3d weightGradient = kernel.weightGradient(i, j, k);
 
 					// index of this node in the active node list
 					Node& node = system.nodes_[gridX][gridY][gridZ];
 					int   ani  = node.activeNodeIndex;
+
+					assert(ani != -1);
 
 					// accumulate node's deformation update (eq 193)
 					part.velGradient += nodeDisHat_.segment<3>(ani * 3) * weightGradient.transpose();
@@ -315,7 +211,7 @@ void SerialImplicitSolver::computeParticleValues(System& system, const SimParame
 		Matrix3d F_P_hat = part.F_P; // F̂_P
 		double   J_P_hat = part.J_P; // Ĵ_P
 
-		// compute all particles elastic deformation gradient estimate F̂_E
+		// compute all particles elastic deformation gradient estimate F̂_E (eq 193)
 		system.constitutiveModel_.updateDeformDecomp(F_E_hat, R_E_hat, F_P_hat, J_P_hat, part.velGradient, parameters.timestep);
 
 		// compute first Piola-Kirchoff Stress estimate P̂ (eq 52)
@@ -336,12 +232,16 @@ void SerialImplicitSolver::computeEnergyGradient(System& system, const SimParame
 		// reference to node
 		Node& nodeI = *activeNodes_[ani];
 
-		for (int pi = 0; pi < nodeI.particles.size(); pi++) {
-			Particle& part = *nodeI.particles[pi];
+		// reset force
+		nodeI.force.setZero();
+
+		for (int npi = 0; npi < nodeI.particles.size(); npi++) {
+			int				pi   = nodeI.particles[npi];
+			const Particle& part = system.particles_[pi];
 
 			// internal stress force estimate f̂_i (eq 194)
 			// loop through node's particles to accumulate internal force
-			nodeI.force -= part.VPFT * nodeI.weightGradients[pi];
+			nodeI.force -= part.VPFT * nodeI.weightGradients[npi];
 		}
 
 		// TODO: implement other external forces
@@ -351,7 +251,7 @@ void SerialImplicitSolver::computeEnergyGradient(System& system, const SimParame
 		}
 
 		// enter node's energy gradient (eq 205 derivative)
-		// ** root finding (eq 200)
+		// ** root finding h(v) (eq 200)
 		energyGradient_.segment<3>(ani * 3) = nodeI.mass * (nodeVelHat_.segment<3>(ani * 3) - nodeI.vel) - parameters.timestep * nodeI.force;
 
 		assert(!energyGradient_.segment<3>(ani * 3).hasNaN());
@@ -446,7 +346,10 @@ void SerialImplicitSolver::computeHessianBlock(int i, int j, const Particle& par
 						for (int c = 0; c < 3; c++) { // γ
 
 							// retrieve ∂2 Ψ/∂F_αβ ∂F_τσ (para above 74)
-							double VdP_dF_abts = part.VdP_dF.coeff(3 * a + b, 3 * t + s);
+							int VdP_dF_row = computeIndexDP_DF(a, b);
+							int VdP_dF_col = computeIndexDP_DF(t, s);
+
+							double VdP_dF_abts = part.VdP_dF.coeff(VdP_dF_row, VdP_dF_col);
 
 							H_iajt += VdP_dF_abts * wg_jp.coeff(w) * wg_ip.coeff(c) * part.F_E_hat.coeff(w, s) * part.F_E_hat.coeff(c, b);
 						}
@@ -458,5 +361,18 @@ void SerialImplicitSolver::computeHessianBlock(int i, int j, const Particle& par
 			int col = 3 * j + t;
 			hessianTriplets_.emplace_back(Triplet<double>(row, col, H_iajt));
 		}
+	}
+}
+
+int SerialImplicitSolver::computeIndexDP_DF(int a, int b)
+{
+	if (a == 0) {
+		return b == 0 ? 0 : b == 1 ? 3 : 5;
+
+	} else if (a == 1) {
+		return b == 0 ? 4 : b == 1 ? 1 : 7;
+
+	} else { // a == 2
+		return b == 0 ? 6 : b == 1 ? 8 : 2;
 	}
 }

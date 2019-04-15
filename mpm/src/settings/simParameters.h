@@ -4,12 +4,12 @@ struct SimParameters {
 	SimParameters()
 	{
 		// default settings
-		solveMethod = SM_OPENMP;
+		selectedSolver = 0;
 
 		timestep = 1e-4;
 		numSteps = 1000;
 
-		particlesPerObject = 10000;
+		particlesPerObject = 100;
 
 		gravityEnabled = true;
 		gravityG	   = 200;
@@ -21,13 +21,9 @@ struct SimParameters {
 		numThreads = 4;
 	};
 
-	enum SolveMethod {
-		SM_EXPLICIT,
-		SM_IMPLICIT,
-		SM_OPENMP
-	};
-
-	SolveMethod solveMethod;
+	int numSolvers;
+	int selectedSolver;
+	const char** solverNames;
 
 	float timestep;
 	int numSteps;

@@ -122,6 +122,16 @@ Eigen::MatrixXd ConstitutiveModel::computeFirstPiolaKirchoffDerivative(const Eig
 	dP_dF.block<2, 2>(5, 5) = computeB_ij(1, 3, Sig, P_S);
 	dP_dF.block<2, 2>(7, 7) = computeB_ij(2, 3, Sig, P_S);
 
+	// TODO : investigate if better to reorder once here, vs calc index in hessian compute
+	// reorder for convenience
+	// index 		:0	, 1	 , 2  , 3  , 4  , 5  , 6  , 7  , 8
+	// Stom order	:s11, s22, s33, s12, s21, s13, s31, s23, s32
+	// Desired 		:s11, s12, s13, s21, s22, s23, s31, s32, s33
+	// Operation	:n/a, 3  , 5  , 4  , 1  , 7  , n/a, 8  , 2   = 7 swaps
+
+	// Desired 		:s11, s21, s31, s12, s22, s32, s13, s23, s33
+	// Operation	:n/a, 4  , 6  , n/a, 1  , 8  , 5  , n/a, 2   = 6 swaps
+
 	return dP_dF;
 }
 
@@ -136,8 +146,8 @@ void ConstitutiveModel::computeMuLambda(double& mu, double& lambda, const double
 Eigen::Matrix2d ConstitutiveModel::computeB_ij(int i, int j, const Eigen::Vector3d& Sig, const Eigen::Vector3d& P_S) const
 {
 	// clamp B denominators (para after 77)
-	double denominatorL = std::max(Sig.coeff(i) - Sig.coeff( j), 1e-6);
-	double denominatorR = std::max(Sig.coeff(i) + Sig.coeff( j), 1e-6);
+	double denominatorL = std::max(Sig.coeff(i) - Sig.coeff(j), 1e-6);
+	double denominatorR = std::max(Sig.coeff(i) + Sig.coeff(j), 1e-6);
 
 	// compute B (eq 77)
 	Matrix2d mR;

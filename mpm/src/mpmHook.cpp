@@ -1,7 +1,7 @@
 #include "mpmHook.h"
+#include "solver/ompSolver.h"
 #include "solver/serialImplicitSolver.h"
 #include "solver/serialSolver.h"
-#include "solver/ompSolver.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
@@ -11,14 +11,24 @@ using namespace Eigen;
 MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	: PhysicsHook()
 	, ui_(renderSettings_, simParameters_, stats_, system_)
-	, initialShapes_(initialShapes)
 {
+	initialShapes_ = initialShapes;
+
 	// available solvers
+	solvers_.emplace_back(new Solver());
 	solvers_.emplace_back(new SerialSolver());
 	solvers_.emplace_back(new SerialImplicitSolver());
 
 	// TODO allow cmake to exclude ompSolver
 	solvers_.emplace_back(new OmpSolver());
+
+	// set solver names for gui
+	simParameters_.numSolvers  = solvers_.size();
+	simParameters_.solverNames = new const char*[solvers_.size()];
+	for (int i = 0; i < solvers_.size(); i++) {
+		Solver* solver				  = solvers_[i];
+		simParameters_.solverNames[i] = solver->name_.c_str();
+	}
 
 	// bounds
 	{
@@ -110,12 +120,11 @@ void MpmHook::tick()
 
 bool MpmHook::simulateOneStep()
 {
-	solvers_[(int)simParameters_.solveMethod]->advance(system_, simParameters_, stats_);
+	solvers_[simParameters_.selectedSolver]->advance(system_, simParameters_, stats_);
 
 	renderNeedsUpdate_ = true;
 
-	if(simParameters_.numSteps == stats_.stepCount)
-	{
+	if (simParameters_.numSteps == stats_.stepCount) {
 		pause();
 	}
 

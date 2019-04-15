@@ -10,7 +10,7 @@ void ParametersUI::draw()
 {
 	ImGui::Separator();
 	ImGui::NewLine();
-	ImGui::Combo("Solver method", (int*)&simParameters_.solveMethod, "Explicit\0Implicit\0OpenMP\0\0");
+	ImGui::Combo("Solver method", &simParameters_.selectedSolver, simParameters_.solverNames, simParameters_.numSolvers);
 	ImGui::InputFloat("Timestep", &simParameters_.timestep, 0.f, 0.f, "%.6f");
 	ImGui::SliderInt("Num Steps", &simParameters_.numSteps, 1, 2000);
 
@@ -23,15 +23,13 @@ void ParametersUI::draw()
 	ImGui::SliderInt("Particle per Object", &simParameters_.particlesPerObject, 1, 100000);
 
 	ImGui::NewLine();
-	ImGui::Text("Selected Solver Settings");
+	ImGui::Text("Specific Solver Settings");
 
-	if (simParameters_.solveMethod == SimParameters::SM_IMPLICIT) {
-		ImGui::SliderInt("Max Iters", &simParameters_.solveMaxIters, 1, 20);
-		ImGui::SliderFloat("Tolerance", &simParameters_.solveTolerance, 0.f, 1.f, "%.4f");
-		ImGui::SliderFloat("Step Length", &simParameters_.solveStepLength, 0.f, 1.f, "%.4f");
-	}
+	ImGui::Text("Implicit");
+	ImGui::SliderInt("Max Iters", &simParameters_.solveMaxIters, 1, 20);
+	ImGui::SliderFloat("Tolerance", &simParameters_.solveTolerance, 0.f, 1.f, "%.4f");
+	ImGui::SliderFloat("Step Length", &simParameters_.solveStepLength, 0.f, 1.f, "%.4f");
 
-	if (simParameters_.solveMethod == SimParameters::SM_OPENMP) {
-		ImGui::SliderInt("Num Threads", &simParameters_.numThreads, 1, 8);
-	}
+	ImGui::Text("OpenMP");
+	ImGui::SliderInt("Num Threads", &simParameters_.numThreads, 1, 8);
 }
