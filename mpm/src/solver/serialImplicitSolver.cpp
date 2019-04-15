@@ -7,19 +7,19 @@ void SerialImplicitSolver::advance(System& system, const SimParameters parameter
 	auto start = std::chrono::high_resolution_clock::now();
 
 	resetGrid(system);
-	clock(stats.timeReset, start);
+	clock(stats.timeReset, stats.totTimeReset, start);
 
 	transferP2G(system, parameters);
-	clock(stats.timeP2G, start);
+	clock(stats.timeP2G, stats.totTimeP2G, start);
 
 	computeGrid(system, parameters);
-	clock(stats.timeGrid, start);
+	clock(stats.timeGrid, stats.totTimeGrid, start);
 
 	transferG2P(system, parameters);
-	clock(stats.timeG2P, start);
+	clock(stats.timeG2P, stats.totTimeG2P, start);
 
 	computeParticle(system, parameters);
-	clock(stats.timePart, start);
+	clock(stats.timePart, stats.totTimePart, start);
 
 	// log stats
 	stats.simTime += parameters.timestep;

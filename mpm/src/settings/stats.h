@@ -1,23 +1,30 @@
 #pragma once
 
-struct Stats{
-    Stats()
-    {
-    };
+struct Stats {
+	Stats()
+	{
+	};
 
-    void reset()
-    {
-        stepCount = 0;
-        simTime = 0.f;
-    }
+	void reset()
+	{
+		stepCount = 0;
+		simTime   = 0.f;
+	}
 
-    int stepCount;
-    float simTime;
+	int   stepCount;
+	float simTime;
 
-    // sim clock
-    int timeReset;
-    int timeP2G;
-    int timeGrid;
-    int timeG2P;
-    int timePart;
+	// time of last step
+	int timeReset;
+	int timeP2G;
+	int timeGrid;
+	int timeG2P;
+	int timePart;
+
+	// total time of step
+	int totTimeReset;
+	int totTimeP2G;
+	int totTimeGrid;
+	int totTimeG2P;
+	int totTimePart;
 };
