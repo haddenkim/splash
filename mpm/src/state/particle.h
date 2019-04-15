@@ -1,5 +1,5 @@
 #pragma once
-#include "solver/interpolation.h"
+#include "models/interpolation.h"
 #include <Eigen/Core>
 
 struct Particle {
