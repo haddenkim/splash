@@ -21,6 +21,6 @@ struct Interpolation {
 	Eigen::Vector3i node0;  // node position of 1st node in grid frame
 	Eigen::Vector3d vecI0P; // vector from start node (I_0) to particle in grid frame
 
-	Eigen::Vector3d w[3];		// w_aip
-	Eigen::Vector3d wGrad_H[3]; // ∇w_aip / dx
+	double			w[3][3][3];		  // w_aip
+	Eigen::Vector3d wGrad_H[3][3][3]; // ∇w_aip
 };
