@@ -114,6 +114,11 @@ bool MpmHook::simulateOneStep()
 
 	renderNeedsUpdate_ = true;
 
+	if(simParameters_.numSteps == stats_.stepCount)
+	{
+		pause();
+	}
+
 	return false;
 }
 

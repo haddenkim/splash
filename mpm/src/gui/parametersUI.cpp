@@ -12,6 +12,7 @@ void ParametersUI::draw()
 	ImGui::NewLine();
 	ImGui::Combo("Solver method", (int*)&simParameters_.solveMethod, "Explicit\0Implicit\0OpenMP\0\0");
 	ImGui::InputFloat("Timestep", &simParameters_.timestep, 0.f, 0.f, "%.6f");
+	ImGui::SliderInt("Num Steps", &simParameters_.numSteps, 1, 2000);
 
 	ImGui::NewLine();
 	ImGui::Checkbox("Gravity?", &simParameters_.gravityEnabled);

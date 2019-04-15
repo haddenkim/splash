@@ -7,6 +7,7 @@ struct SimParameters {
 		solveMethod = SM_OPENMP;
 
 		timestep = 1e-4;
+		numSteps = 1000;
 
 		particlesPerObject = 10000;
 
@@ -29,6 +30,7 @@ struct SimParameters {
 	SolveMethod solveMethod;
 
 	float timestep;
+	int numSteps;
 
 	int particlesPerObject;
 
