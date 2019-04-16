@@ -1,5 +1,6 @@
 #include "mpmHook.h"
 #include "solver/ompSolver.h"
+#include "solver/serialImplicitCRSolver.h"
 #include "solver/serialImplicitSolver.h"
 #include "solver/serialSolver.h"
 
@@ -18,6 +19,7 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	solvers_.emplace_back(new Solver());
 	solvers_.emplace_back(new SerialSolver());
 	solvers_.emplace_back(new SerialImplicitSolver());
+	solvers_.emplace_back(new SerialImplicitCRSolver());
 
 	// TODO allow cmake to exclude ompSolver
 	solvers_.emplace_back(new OmpSolver());
@@ -27,7 +29,7 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	simParameters_.solverNames = new const char*[solvers_.size()];
 	for (int i = 0; i < solvers_.size(); i++) {
 		Solver* solver				  = solvers_[i];
-		simParameters_.solverNames[i] = solver->name_.c_str();
+		simParameters_.solverNames[i] = solver->name().c_str();
 	}
 
 	// bounds

@@ -5,7 +5,7 @@
 
 class SerialImplicitSolver : public Solver {
 public:
-	SerialImplicitSolver();
+	std::string name() override { return "Implicit"; };
 
 private:
 	void resetGrid(System& system);

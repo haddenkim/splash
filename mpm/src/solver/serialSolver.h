@@ -4,7 +4,7 @@
 
 class SerialSolver : public Solver {
 public:
-	SerialSolver();
+	std::string name() override { return "Node 1st"; };
 
 protected:
 	void transferP2G(System& system, const SimParameters& parameters) override;

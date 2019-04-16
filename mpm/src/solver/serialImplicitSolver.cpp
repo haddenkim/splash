@@ -2,11 +2,6 @@
 
 using namespace Eigen;
 
-SerialImplicitSolver::SerialImplicitSolver()
-{
-	name_ = "Serial Implicit";
-}
-
 void SerialImplicitSolver::resetGrid(System& system)
 {
 	// reset bookkeeping

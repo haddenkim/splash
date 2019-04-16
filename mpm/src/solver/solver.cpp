@@ -3,11 +3,6 @@
 #include <Eigen/Dense>
 using namespace Eigen;
 
-Solver::Solver()
-{
-	name_ = "Default";
-}
-
 void Solver::clock(unsigned int& current, unsigned int& total, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds>& start)
 {
 	auto end	  = std::chrono::high_resolution_clock::now();

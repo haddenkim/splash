@@ -4,11 +4,6 @@
 
 using namespace Eigen;
 
-SerialSolver::SerialSolver()
-{
-	name_ = "Serial by Node";
-}
-
 void SerialSolver::transferP2G(System& system, const SimParameters& parameters)
 {
 // try storing particles ownership in ALL 27 nodes, and reduce the looping here
