@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+#include <vector>
 
 struct SimParameters {
 	SimParameters()
@@ -9,24 +11,24 @@ struct SimParameters {
 		timestep = 1e-4;
 		numSteps = 1000;
 
-		particlesPerObject = 100;
+		particlesPerObject = 10000;
 
 		gravityEnabled = true;
 		gravityG	   = 200;
 
-		solveTolerance = 1e-4;
-		solveMaxIters  = 5;
+		solveTolerance  = 1e-4;
+		solveMaxIters   = 5;
 		solveStepLength = 1;
 
 		numThreads = 4;
 	};
 
-	int numSolvers;
-	int selectedSolver;
-	const char** solverNames;
+	int	selectedSolver;
+	int	numSolvers;
+	char** solverNames;
 
 	float timestep;
-	int numSteps;
+	int   numSteps;
 
 	int particlesPerObject;
 
@@ -34,11 +36,10 @@ struct SimParameters {
 	float gravityG;
 
 	// implicit solver parameters
-	int	solveMaxIters;   //
+	int   solveMaxIters;   //
 	float solveTolerance;  // τ
 	float solveStepLength; // α
 
 	// OpenMP solver parameters
 	int numThreads;
-
 };
