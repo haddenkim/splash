@@ -2,7 +2,6 @@
 #include "solver/ompSolver.h"
 #include "solver/serialImplicitCRSolver.h"
 #include "solver/serialImplicitSolver.h"
-#include "solver/serialSolver.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
@@ -20,7 +19,6 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	solvers_.emplace_back(new OmpSolver());
 
 	solvers_.emplace_back(new Solver());
-	solvers_.emplace_back(new SerialSolver());
 	solvers_.emplace_back(new SerialImplicitSolver());
 	solvers_.emplace_back(new SerialImplicitCRSolver());
 
