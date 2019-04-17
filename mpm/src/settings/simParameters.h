@@ -1,4 +1,5 @@
 #pragma once
+#include <omp.h>
 #include <string>
 #include <vector>
 
@@ -20,7 +21,9 @@ struct SimParameters {
 		solveMaxIters   = 5;
 		solveStepLength = 1;
 
-		numThreads = 4;
+		// set max threads
+		numThreads   = omp_get_num_procs();
+		availThreads = numThreads;
 	};
 
 	int	selectedSolver;
@@ -42,4 +45,5 @@ struct SimParameters {
 
 	// OpenMP solver parameters
 	int numThreads;
+	int availThreads;
 };

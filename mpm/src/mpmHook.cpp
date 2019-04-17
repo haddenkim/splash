@@ -16,24 +16,23 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	initialShapes_ = initialShapes;
 
 	// available solvers
+	// TODO allow cmake to exclude ompSolver
+	solvers_.emplace_back(new OmpSolver());
+
 	solvers_.emplace_back(new Solver());
 	solvers_.emplace_back(new SerialSolver());
 	solvers_.emplace_back(new SerialImplicitSolver());
 	solvers_.emplace_back(new SerialImplicitCRSolver());
 
-	// TODO allow cmake to exclude ompSolver
-	solvers_.emplace_back(new OmpSolver());
-
 	// set solver names for gui
 	simParameters_.solverNames = new char*[solvers_.size()];
-	simParameters_.numSolvers = solvers_.size();
+	simParameters_.numSolvers  = solvers_.size();
 	for (int i = 0; i < solvers_.size(); i++) {
 
 		std::string name = solvers_[i]->name();
 
 		simParameters_.solverNames[i] = new char[name.size()];
 		strncpy(simParameters_.solverNames[i], name.c_str(), name.size());
-
 	}
 
 	// bounds

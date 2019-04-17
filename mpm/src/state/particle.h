@@ -19,7 +19,7 @@ struct Particle {
 		J_P = 1.0;
 	}
 
-	// Time independent
+	// invariant
 	Eigen::RowVector3d color; // rendering color
 	double			   mass0; // intial mass
 	double			   vol0;  // initial volume
@@ -41,6 +41,7 @@ struct Particle {
 	Eigen::Matrix3d VPFT;		 // V_p * P(F_p) * (F_p)^T (eq 189)
 	Eigen::Matrix3d velGradient; // accumulation of ∇v_p = Σ_i(v_i * ∇w_ip) (eq 181) (stomakhin step 7)
 
+	// only used by implicit solvers
 	Eigen::Matrix3d F_E_hat; // estimated F̂_E
 	Eigen::MatrixXd VdP_dF;   // Vol * ∂P/∂F
 };

@@ -31,5 +31,5 @@ void ParametersUI::draw()
 	ImGui::SliderFloat("Step Length", &simParameters_.solveStepLength, 0.f, 1.f, "%.4f");
 
 	ImGui::Text("OpenMP");
-	ImGui::SliderInt("Num Threads", &simParameters_.numThreads, 1, 8);
+	ImGui::SliderInt("Num Threads", &simParameters_.numThreads, 1, simParameters_.availThreads);
 }

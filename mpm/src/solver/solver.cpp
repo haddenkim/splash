@@ -50,17 +50,8 @@ void Solver::resetGrid(System& system)
 				node.mass = 0;
 				node.vel.setZero();
 				node.force.setZero();
-
-				node.particles.clear();
-				node.weightGradients.clear();
 			}
 		}
-	}
-
-	// also reset particle bookkeeping values
-	for (Particle& part : system.particles_) {
-		part.VPFT.setZero();
-		part.velGradient.setZero();
 	}
 }
 
@@ -111,11 +102,9 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 					// stores in node velocity, next mpm step computes velocity from momentum
 					node.vel += weight * part.mass0 * (part.vel + part.B * commonDInvScalar * vecPI);
 
-					// store link to this part for convenience
-					node.particles.push_back(pi);
+					// internal stress force f_i (eq 189)
+					node.force -= part.VPFT * weightGradient;
 
-					// store in node
-					node.weightGradients.push_back(weightGradient);
 				}
 			}
 		}
@@ -139,18 +128,6 @@ void Solver::computeGrid(System& system, const SimParameters& parameters)
 
 				// compute velocity from momentum / mass
 				node.vel /= node.mass;
-
-				// internal stress force f_i (eq 189)
-				// loop through node's particles to accumulate internal force
-				for (int npi = 0; npi < node.particles.size(); npi++) {
-					int				pi   = node.particles[npi];
-					const Particle& part = system.particles_[pi];
-
-					node.force -= part.VPFT * node.weightGradients[npi];
-				}
-
-				for (int pi : node.particles) {
-				}
 
 				// TODO: implement other external forces
 				// Gravity
@@ -191,9 +168,10 @@ void Solver::transferG2P(System& system, const SimParameters& parameters)
 	// loop through part
 	for (Particle& part : system.particles_) {
 
-		// reset velocity v_p and affine state B_p
+		// reset velocity v_p and affine state B_p and velocity gradient ∇v_p
 		part.vel.setZero();
 		part.B.setZero();
+		part.velGradient.setZero();
 
 		// reference to kernel
 		Interpolation& kernel = part.kernel;
