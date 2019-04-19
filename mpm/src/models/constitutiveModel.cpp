@@ -1,4 +1,5 @@
 #include "constitutiveModel.h"
+#include "tensor/tensorHelpers.h"
 #include <cmath>
 
 using namespace Eigen;
@@ -51,22 +52,6 @@ void ConstitutiveModel::updateDeformDecomp(Eigen::Matrix3d&		  F_E,
 	J_P = F_P.determinant();
 }
 
-Eigen::Matrix3d ConstitutiveModel::computeFirstPiolaKirchoff(const Eigen::Matrix3d& F_E,
-															 const Eigen::Matrix3d& R_E,
-															 const double&			J_P) const
-{
-	// compute current mu and lambda (eq 87)
-	double mu;
-	double lambda;
-	computeMuLambda(mu, lambda, J_P);
-
-	// compute determinant of elastic deformation gradient J_E
-	double J_E = F_E.determinant();
-
-	// compute first Piola-Kirchoff Stress P (eq 52)
-	Matrix3d P_hat = 2 * mu * (F_E - R_E) + (lambda * (J_E - 1) * J_E) * F_E.transpose();
-}
-
 Eigen::Matrix3d ConstitutiveModel::computeVolCauchyStress(const double&			 vol0,
 														  const Eigen::Matrix3d& F_E,
 														  const Eigen::Matrix3d& R_E,
@@ -87,52 +72,42 @@ Eigen::Matrix3d ConstitutiveModel::computeVolCauchyStress(const double&			 vol0,
 	return vol0 * PFT;
 }
 
-Eigen::MatrixXd ConstitutiveModel::computeFirstPiolaKirchoffDerivative(const Eigen::Matrix3d& F_E,
-																	   const Eigen::Matrix3d& R_E,
-																	   const double&		  J_P) const
+// computes First Piola Kirchoff Differential δP
+Eigen::Matrix3d ConstitutiveModel::computeFirstPiolaKirchoffDifferential(const Eigen::Matrix3d& differentialF_E,
+																		 const Eigen::Matrix3d& F_E,
+																		 const double&			J_P) const
 {
+	// δP = [∂P/∂F]:δF
+
 	// compute current mu and lambda (eq 87)
 	double mu;
 	double lambda;
 	computeMuLambda(mu, lambda, J_P);
 
-	// compute U Σ V^T from svd F
+	// SVD of F_E (eq 83)
 	JacobiSVD<Matrix3d> svd(F_E, ComputeFullU | ComputeFullV);
 	Matrix3d			U   = svd.matrixU();		// U
 	Vector3d			Sig = svd.singularValues(); // Σ
 	Matrix3d			V   = svd.matrixV();		// V
 
-	double   J_S	= Sig.prod();			 // det(Σ)
-	Vector3d SigInv = Sig.array().inverse(); // Σ^-1
+	// construct R (rotation) and S (symmetric) matrix (para above 52)
+	Eigen::Matrix3d S_E = V * Sig.asDiagonal() * V.transpose();
+	Eigen::Matrix3d R_E = U * V.transpose();
 
-	// compute P(Σ) aka ∂Ψ̂ /∂σ (sentence after eq 63)
-	//   P(Σ) = μ(Σ - I) + λ(J_S -1)(J_S)Σ^-1
-	Vector3d P_S = mu * (Sig.array() - 1).matrix() + lambda * (J_S - 1) * J_S * SigInv;
+	// precompute for convenience
+	double   J_E	  = F_E.determinant();
+	Matrix3d JFinvT_E = J_E * F_E.inverse().transpose(); // JF^-T
 
-	// compute ∂2Ψ/∂2σ aka A (eq 75)
-	//   ∂P̂/∂Σ = μ(∂Σ/∂Σ) + λ(J - 1)J (∂Σ^-1/∂Σ) + λ(2J - 1)(∂J/∂Σ)Σ^-1
-	//   ∂P̂/∂Σ = (μ + λ(J - 1)J)I + λ(2J - 1)(∂J/∂Σ)Σ^-1
-	Matrix3d dP_dSig = (mu * lambda * (J_S - 1) * J_S) * Matrix3d::Identity() + lambda * (2 * J_S - 1) * (J_S * SigInv * SigInv.transpose());
+	// compute differential R
+	Matrix3d differentialR_E = computeDifferentialR(differentialF_E, R_E, S_E);
 
-	//  construct ∂P/∂F (para above 75 )
-	MatrixXd dP_dF(9, 9);
-	dP_dF.setZero();
-	dP_dF.block<3, 3>(0, 0) = dP_dSig;
-	dP_dF.block<2, 2>(3, 3) = computeB_ij(1, 2, Sig, P_S);
-	dP_dF.block<2, 2>(5, 5) = computeB_ij(1, 3, Sig, P_S);
-	dP_dF.block<2, 2>(7, 7) = computeB_ij(2, 3, Sig, P_S);
+	// compute differential JF^-T
+	Matrix3d differentialJFinvT = computeDifferentialJFinvT(differentialF_E, F_E);
 
-	// TODO : investigate if better to reorder once here, vs calc index in hessian compute
-	// reorder for convenience
-	// index 		:0	, 1	 , 2  , 3  , 4  , 5  , 6  , 7  , 8
-	// Stom order	:s11, s22, s33, s12, s21, s13, s31, s23, s32
-	// Desired 		:s11, s12, s13, s21, s22, s23, s31, s32, s33
-	// Operation	:n/a, 3  , 5  , 4  , 1  , 7  , n/a, 8  , 2   = 7 swaps
-
-	// Desired 		:s11, s21, s31, s12, s22, s32, s13, s23, s33
-	// Operation	:n/a, 4  , 6  , n/a, 1  , 8  , 5  , n/a, 2   = 6 swaps
-
-	return dP_dF;
+	// compute δP (eq 56) aka A_p (eq 197)
+	return 2 * mu * (differentialF_E - differentialR_E)
+		+ lambda * JFinvT_E * doubleContraction(JFinvT_E, differentialF_E)
+		+ lambda * (J_E - 1) * differentialJFinvT;
 }
 
 void ConstitutiveModel::computeMuLambda(double& mu, double& lambda, const double& J_P) const
@@ -143,16 +118,77 @@ void ConstitutiveModel::computeMuLambda(double& mu, double& lambda, const double
 	lambda	 = lambda0_ * exp;
 }
 
-Eigen::Matrix2d ConstitutiveModel::computeB_ij(int i, int j, const Eigen::Vector3d& Sig, const Eigen::Vector3d& P_S) const
+Eigen::Matrix3d ConstitutiveModel::computeDifferentialJFinvT(const Eigen::Matrix3d& differentialF_E, const Eigen::Matrix3d& F_E) const
 {
-	// clamp B denominators (para after 77)
-	double denominatorL = std::max(Sig.coeff(i) - Sig.coeff(j), 1e-6);
-	double denominatorR = std::max(Sig.coeff(i) + Sig.coeff(j), 1e-6);
+	// compute δ(JF^-T) (para after eq 56)
+	// δ(JF^-T) = ∂(JF^-T)/∂F : δF  (para after eq 56)
 
-	// compute B (eq 77)
-	Matrix2d mR;
-	mR << 1, -1, -1, 1;
+	// matlab output
+	// dFunc_dF_ddot_dF =
+	// [ F2_2*dF3_3 - F2_3*dF3_2 - F3_2*dF2_3 + F3_3*dF2_2,   F2_3*dF3_1 - F2_1*dF3_3 + F3_1*dF2_3 - F3_3*dF2_1,   F2_1*dF3_2 - F2_2*dF3_1 - F3_1*dF2_2 + F3_2*dF2_1]
+	// [ F1_3*dF3_2 - F1_2*dF3_3 + F3_2*dF1_3 - F3_3*dF1_2,   F1_1*dF3_3 - F1_3*dF3_1 - F3_1*dF1_3 + F3_3*dF1_1,   F1_2*dF3_1 - F1_1*dF3_2 + F3_1*dF1_2 - F3_2*dF1_1]
+	// [ F1_2*dF2_3 - F1_3*dF2_2 - F2_2*dF1_3 + F2_3*dF1_2,   F1_3*dF2_1 - F1_1*dF2_3 + F2_1*dF1_3 - F2_3*dF1_1,   F1_1*dF2_2 - F1_2*dF2_1 - F2_1*dF1_2 + F2_2*dF1_1]
 
-	return 0.5 * (P_S.coeff(i) - P_S.coeff(j)) / denominatorL * Matrix2d::Ones()
-		+ 0.5 * (P_S.coeff(i) + P_S.coeff(j)) / denominatorR * mR;
+	// for convenience (should be opimized away)
+	const Matrix3d& F  = F_E;
+	const Matrix3d& dF = differentialF_E;
+
+	Matrix3d ret;
+	ret(0, 0) = F(1, 1) * dF(2, 2) - F(1, 2) * dF(2, 1) - F(2, 1) * dF(1, 2) + F(2, 2) * dF(1, 1);
+	ret(0, 1) = F(1, 2) * dF(2, 0) - F(1, 0) * dF(2, 2) + F(2, 0) * dF(1, 2) - F(2, 2) * dF(1, 0);
+	ret(0, 2) = F(1, 0) * dF(2, 1) - F(1, 1) * dF(2, 0) - F(2, 0) * dF(1, 1) + F(2, 1) * dF(1, 0);
+
+	ret(1, 0) = F(0, 2) * dF(2, 1) - F(0, 1) * dF(2, 2) + F(2, 1) * dF(0, 2) - F(2, 2) * dF(0, 1);
+	ret(1, 1) = F(0, 0) * dF(2, 2) - F(0, 2) * dF(2, 0) - F(2, 0) * dF(0, 2) + F(2, 2) * dF(0, 0);
+	ret(1, 2) = F(0, 1) * dF(2, 0) - F(0, 0) * dF(2, 1) + F(2, 0) * dF(0, 1) - F(2, 1) * dF(0, 0);
+
+	ret(2, 0) = F(0, 1) * dF(1, 2) - F(0, 2) * dF(1, 1) - F(1, 1) * dF(0, 2) + F(1, 2) * dF(0, 1);
+	ret(2, 1) = F(0, 2) * dF(1, 0) - F(0, 0) * dF(1, 2) + F(1, 0) * dF(0, 2) - F(1, 2) * dF(0, 0);
+	ret(2, 2) = F(0, 0) * dF(1, 1) - F(0, 1) * dF(1, 0) - F(1, 0) * dF(0, 1) + F(1, 1) * dF(0, 0);
+
+	return ret;
+}
+
+Eigen::Matrix3d ConstitutiveModel::computeDifferentialR(const Eigen::Matrix3d& differentialF_E,
+														const Eigen::Matrix3d& R_E,
+														const Eigen::Matrix3d& S_E) const
+{
+
+	// compute R^T δF - δF^T R (eq 59 lhs)
+	Matrix3d lhs = R_E.transpose() * differentialF_E - differentialF_E.transpose() * R_E;
+
+	// compute R^T δR components
+	// lhs = [R^T δR]S + S[R^T δR] (eq 59)
+	// |  0  d  e  |   |  0  a  b  | | 		|	 |		| |  0  a  b  |
+	// | -d  0  f  | = | -a  0  c  | |	S	|  + |	S	| | -a  0  c  |
+	// | -e -f  0  |   | -b -c  0  | |		|	 |		| | -b -c  0  |
+
+	// from matlab
+	// d = a*S1_1 + a*S2_2 - c*S1_3 + b*S3_2
+	// e = b*S1_1 + a*S2_3 + c*S1_2 + b*S3_3
+	// f = b*S2_1 - a*S1_3 + c*S2_2 + c*S3_3
+
+	// [ S1_1 + S2_2,	S3_2,			-S1_3		]
+	// [ S2_3,			S1_1 + S3_3,	S1_2		]
+	// [ -S1_3,        	S2_1, 			S2_2 + S3_3	]
+
+	Matrix3d eqs;
+	eqs << S_E(0, 0) + S_E(1, 1), S_E(2, 1), -S_E(0, 2),
+		S_E(1, 2), S_E(0, 0) + S_E(2, 2), S_E(0, 1),
+		-S_E(0, 2), S_E(1, 0), S_E(1, 1) + S_E(2, 2);
+
+	Vector3d vars = Vector3d(lhs(0, 1), lhs(0, 2), lhs(1, 2));
+
+	// solve system of equations
+	vars = eqs.inverse() * vars;
+
+	// construct R^T δR
+	// |  0  a  b  |
+	// | -a  0  c  |
+	// | -b -c  0  |
+	Matrix3d RTdR;
+	RTdR << 0, vars(0), vars(1), -vars(0), 0, vars(2), -vars(1), -vars(2), 0;
+
+	// compute δR (para after eq 59)
+	return R_E * RTdR;
 }

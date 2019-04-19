@@ -26,9 +26,8 @@ void ParametersUI::draw()
 	ImGui::Text("Specific Solver Settings");
 
 	ImGui::Text("Implicit");
-	ImGui::SliderInt("Max Iters", &simParameters_.solveMaxIters, 1, 20);
+	ImGui::SliderInt("Max Iters", &simParameters_.solveMaxIters, 1, 50);
 	ImGui::SliderFloat("Tolerance", &simParameters_.solveTolerance, 0.f, 1.f, "%.4f");
-	ImGui::SliderFloat("Step Length", &simParameters_.solveStepLength, 0.f, 1.f, "%.4f");
 
 	ImGui::Text("OpenMP");
 	ImGui::SliderInt("Num Threads", &simParameters_.numThreads, 1, simParameters_.availThreads);

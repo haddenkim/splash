@@ -23,9 +23,10 @@ struct Node {
 	std::set<int> ownedParticles;
 
 	// only used by implicit solvers
-	std::vector<int>			 particles;		  // nearby particles that contibute to this node
-	std::vector<Eigen::Vector3d> weightGradients; // per particle
-	int							 activeNodeIndex; // index in the active node list
+	// std::vector<int>			 particles;		  // nearby particles that contibute to this node
+	// std::vector<Eigen::Vector3d> weightGradients; // per particle
+
+	Eigen::Vector3d differentialU; // δu aka δvelocity
 
 	// only used by openMP solver
 	int		   approxParts; // number of particles in node's range. intentionally allowed race condition

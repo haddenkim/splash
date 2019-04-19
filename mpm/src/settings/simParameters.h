@@ -17,9 +17,9 @@ struct SimParameters {
 		gravityEnabled = true;
 		gravityG	   = 200;
 
+		B				= 1.f;
 		solveTolerance  = 1e-4;
-		solveMaxIters   = 5;
-		solveStepLength = 1;
+		solveMaxIters   = 20;
 
 		// set max threads
 		numThreads   = omp_get_num_procs();
@@ -39,9 +39,9 @@ struct SimParameters {
 	float gravityG;
 
 	// implicit solver parameters
+	float B;			   // β interpolation weight
 	int   solveMaxIters;   //
 	float solveTolerance;  // τ
-	float solveStepLength; // α
 
 	// OpenMP solver parameters
 	int numThreads;

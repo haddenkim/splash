@@ -131,9 +131,9 @@ void OmpSolver::transferP2G(System& system, const SimParameters& parameters)
 					const Node& kernelNode = system.nodes_[gridX][gridY][gridZ];
 
 					// loop through particles in kernel node
-					for (int npi : kernelNode.ownedParticles) {
+					for (int pi : kernelNode.ownedParticles) {
 
-						const Particle&		 part   = system.particles_[npi];
+						const Particle&		 part   = system.particles_[pi];
 						const Interpolation& kernel = part.kernel;
 
 						double   weight			= part.kernel.weight(2 - ki, 2 - kj, 2 - kk);
@@ -219,7 +219,7 @@ void OmpSolver::transferG2P(System& system, const SimParameters& parameters)
 		part.velGradient.setZero();
 
 		// reference to kernel
-		Interpolation& kernel = part.kernel;
+		const Interpolation& kernel = part.kernel;
 
 		// loop through kernel nodes
 		for (int i = 0; i < 3; i++) {

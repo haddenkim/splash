@@ -174,7 +174,7 @@ void Solver::transferG2P(System& system, const SimParameters& parameters)
 		part.velGradient.setZero();
 
 		// reference to kernel
-		Interpolation& kernel = part.kernel;
+		const Interpolation& kernel = part.kernel;
 
 		// loop through kernel nodes
 		for (int i = 0; i < 3; i++) {
