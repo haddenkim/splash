@@ -19,6 +19,8 @@ struct RenderSettings {
 		showGridVelocity = false;
 
 		showBoundary = true;
+
+		visibilityChanged = true;
 	};
 
 	// draw rate
@@ -40,4 +42,6 @@ struct RenderSettings {
 	bool showGridForce;
 
 	bool showBoundary;
+
+	bool visibilityChanged;
 };

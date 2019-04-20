@@ -1,6 +1,5 @@
 #include "mpmHook.h"
 #include "solver/ompSolver.h"
-#include "solver/serialImplicitCRSolver.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
@@ -14,7 +13,7 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	initialShapes_ = initialShapes;
 
 	// available solvers
-	solvers_.emplace_back(new SerialImplicitCRSolver());
+	// solvers_.emplace_back(new SerialImplicitCRSolver());
 	solvers_.emplace_back(new OmpSolver());
 	solvers_.emplace_back(new Solver());
 
@@ -28,11 +27,38 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 		simParameters_.solverNames[i] = new char[name.size()];
 		strncpy(simParameters_.solverNames[i], name.c_str(), name.size());
 	}
+}
+
+void MpmHook::drawGUI()
+{
+	ui_.draw();
+}
+
+void MpmHook::initSimulation()
+{
+	renderDataNeedsUpdates_ = true;
+
+	system_.reset(simParameters_.gridSize);
+	stats_.reset();
+
+	for(Solver* solver: solvers_)
+	{
+		solver->reset();
+	}
+
+	// rebuild system
+	for (const Shape& shape : initialShapes_) {
+		system_.addCube(simParameters_.particlesPerObject,
+						shape.center,
+						shape.velocity,
+						shape.color);
+	}
+	system_.sortParticles();
 
 	// bounds
 	{
-		double s = system_.boundary_;	 // start
-		double e = 1 - system_.boundary_; // end
+		double s = (double)system_.boundaryStart_ / system_.gridSize_; // start
+		double e = (double)system_.boundaryEnd_ / system_.gridSize_;   // end
 
 		// x = L(eft) or R(ight)
 		// y = D(own) or U(p)
@@ -70,47 +96,17 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 
 	// grid nodes
 	{
-		int gsize = system_.gridSize_ * system_.gridSize_ * system_.gridSize_;
-		gridPositions_.resize(gsize, 3);
-		gridVelocities_.resize(gsize, 3);
-		gridForces_.resize(gsize, 3);
+		int nodeCount = system_.nodes_.size();
+		gridPositions_.resize(nodeCount, 3);
+		gridVelocities_.resize(nodeCount, 3);
+		gridForces_.resize(nodeCount, 3);
 
-		int gi = 0;
-		for (int i = 0; i < system_.gridSize_; i++) {
-			for (int j = 0; j < system_.gridSize_; j++) {
-				for (int k = 0; k < system_.gridSize_; k++) {
+		for (int ni = 0; ni < nodeCount; ni++) {
+			const Node& node = system_.nodes_[ni];
 
-					Vector3d nodePosition			  = Vector3d(i, j, k);
-					gridPositions_.block<1, 3>(gi, 0) = nodePosition;
-
-					gi++;
-				}
-			}
+			gridPositions_.block<1, 3>(ni, 0) = RowVector3d(node.x, node.y, node.z) / system_.gridSize_;
 		}
-
-		// scale
-		gridPositions_ *= system_.dx_;
 	}
-}
-
-void MpmHook::drawGUI()
-{
-	ui_.draw();
-}
-
-void MpmHook::initSimulation()
-{
-	system_.clear();
-	stats_.reset();
-
-	for (const Shape& shape : initialShapes_) {
-		system_.addCube(simParameters_.particlesPerObject,
-						shape.center,
-						shape.velocity,
-						shape.color);
-	}
-
-	renderNeedsUpdate_ = true;
 }
 
 void MpmHook::tick()
@@ -121,7 +117,7 @@ bool MpmHook::simulateOneStep()
 {
 	solvers_[simParameters_.selectedSolver]->advance(system_, simParameters_, stats_);
 
-	renderNeedsUpdate_ = true;
+	renderDataNeedsUpdates_ = true;
 
 	if (simParameters_.numSteps == stats_.stepCount) {
 		pause();
@@ -132,7 +128,7 @@ bool MpmHook::simulateOneStep()
 
 void MpmHook::updateRenderGeometry()
 {
-	if (stats_.stepCount % renderSettings_.drawInverval == 0 && renderNeedsUpdate_) {
+	if (stats_.stepCount % renderSettings_.drawInverval == 0 && renderDataNeedsUpdates_) {
 
 		// particles
 		{
@@ -142,7 +138,7 @@ void MpmHook::updateRenderGeometry()
 			particleVelocities_.resize(psize, 3);
 
 			for (int i = 0; i < psize; i++) {
-				particlePositions_.block<1, 3>(i, 0) = system_.particles_[i].pos;
+				particlePositions_.block<1, 3>(i, 0) = system_.particles_[i].pos / system_.gridSize_;
 				particleColors_.block<1, 3>(i, 0)	= system_.particles_[i].color;
 
 				particleVelocities_.block<1, 3>(i, 0) = system_.particles_[i].vel;
@@ -157,23 +153,17 @@ void MpmHook::updateRenderGeometry()
 
 		// grid
 		{
-			int gi = 0;
-			for (int i = 0; i < system_.gridSize_; i++) {
-				for (int j = 0; j < system_.gridSize_; j++) {
-					for (int k = 0; k < system_.gridSize_; k++) {
-						const Node& node = system_.nodes_[i][j][k];
+			for (int ni = 0; ni < system_.nodes_.size(); ni++) {
+				const Node& node = system_.nodes_[ni];
 
-						gridVelocities_.block<1, 3>(gi, 0) = node.vel;
-						gridForces_.block<1, 3>(gi, 0)	 = node.force;
-
-						gi++;
-					}
-				}
+				gridVelocities_.block<1, 3>(ni, 0) = node.vel / system_.gridSize_;
+				gridForces_.block<1, 3>(ni, 0)	 = node.force / system_.gridSize_;
 			}
-		}
 
-		// update flag
-		renderNeedsUpdate_ = false;
+			// update flag
+			renderDataNeedsUpdates_ = false;
+			renderNeedsUpdate_		= true;
+		}
 	}
 }
 
@@ -182,7 +172,7 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 	viewer.data().point_size = renderSettings_.pointSize;
 	viewer.data().line_width = renderSettings_.lineWidth;
 
-	if (stats_.stepCount % renderSettings_.drawInverval == 0) {
+	if (renderNeedsUpdate_ || renderSettings_.visibilityChanged) {
 
 		viewer.data().clear();
 
@@ -206,6 +196,11 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 		}
 
 		// grid
+		if (renderSettings_.showGrid) {
+			RowVector3d lightGrey(0.8, 0.8, 0.8);
+			viewer.data().add_points(gridPositions_, lightGrey);
+		}
+
 		if (renderSettings_.showGridVelocity) {
 			RowVector3d red(1, 0, 0);
 			viewer.data().add_edges(gridPositions_, gridPositions_ + (gridVelocities_ * renderSettings_.vectorScale), red);
@@ -216,10 +211,13 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 			viewer.data().add_edges(gridPositions_, gridPositions_ + (gridForces_ * renderSettings_.vectorScale), red);
 		}
 
-		// write png
-		if (renderSettings_.writePNG && !isPaused()) {
+		// write png only when sim changes, not if visibility settings change
+		if (renderSettings_.writePNG && !isPaused() && renderNeedsUpdate_) {
 			writePNG(viewer);
 		}
+
+		renderNeedsUpdate_				  = false;
+		renderSettings_.visibilityChanged = false;
 	}
 }
 

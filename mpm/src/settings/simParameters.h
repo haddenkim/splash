@@ -9,17 +9,18 @@ struct SimParameters {
 		// default settings
 		selectedSolver = 0;
 
-		timestep = 1e-4;
+		timestep = 1e-3;
 		numSteps = 1000;
 
 		particlesPerObject = 10000;
+		gridSize = 63;
 
 		gravityEnabled = true;
-		gravityG	   = 200;
+		gravityG	   = 10;
 
-		B				= 1.f;
-		solveTolerance  = 1e-4;
-		solveMaxIters   = 20;
+		B			   = 1.f;
+		solveTolerance = 1e-4;
+		solveMaxIters  = 20;
 
 		// set max threads
 		numThreads   = omp_get_num_procs();
@@ -34,14 +35,15 @@ struct SimParameters {
 	int   numSteps;
 
 	int particlesPerObject;
+	int gridSize;
 
 	bool  gravityEnabled;
 	float gravityG;
 
 	// implicit solver parameters
-	float B;			   // β interpolation weight
-	int   solveMaxIters;   //
-	float solveTolerance;  // τ
+	float B;			  // β interpolation weight
+	int   solveMaxIters;  //
+	float solveTolerance; // τ
 
 	// OpenMP solver parameters
 	int numThreads;

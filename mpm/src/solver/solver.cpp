@@ -3,14 +3,8 @@
 #include <Eigen/Dense>
 using namespace Eigen;
 
-void Solver::clock(unsigned int& current, unsigned int& total, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds>& start)
+void Solver::reset()
 {
-	auto end	  = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	start		  = end;
-
-	current = duration.count();
-	total += current;
 }
 
 void Solver::advance(System& system, const SimParameters parameters, Stats& stats)
@@ -41,17 +35,10 @@ void Solver::advance(System& system, const SimParameters parameters, Stats& stat
 
 void Solver::resetGrid(System& system)
 {
-	for (int i = 0; i < system.gridSize_; i++) {
-		for (int j = 0; j < system.gridSize_; j++) {
-			for (int k = 0; k < system.gridSize_; k++) {
-				// reference to node
-				Node& node = system.nodes_[i][j][k];
-
-				node.mass = 0;
-				node.vel.setZero();
-				node.force.setZero();
-			}
-		}
+	for (Node& node : system.nodes_) {
+		node.mass = 0;
+		node.vel.setZero();
+		node.force.setZero();
 	}
 }
 
@@ -81,8 +68,7 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 					int gridZ = kernel.node0.z() + k;
 
 					// skip if out of bounds
-					if (gridX < 0 || gridY < 0 || gridZ < 0
-						|| gridX >= system.gridSize_ || gridY >= system.gridSize_ || gridZ >= system.gridSize_) {
+					if (!system.isInBounds(gridX, gridY, gridZ)) {
 						continue;
 					}
 
@@ -90,7 +76,7 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 					Vector3d weightGradient = kernel.weightGradient(i, j, k);
 
 					// reference to node
-					Node& node = system.nodes_[gridX][gridY][gridZ];
+					Node& node = *system.getNode(gridX, gridY, gridZ);
 
 					// accumulate mass (eq. 172)
 					node.mass += weight * part.mass0;
@@ -104,7 +90,6 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 
 					// internal stress force f_i (eq 189)
 					node.force -= part.VPFT * weightGradient;
-
 				}
 			}
 		}
@@ -114,52 +99,27 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 void Solver::computeGrid(System& system, const SimParameters& parameters)
 {
 	// loop through all nodes
-	for (int i = 0; i < system.gridSize_; i++) {
-		for (int j = 0; j < system.gridSize_; j++) {
-			for (int k = 0; k < system.gridSize_; k++) {
 
-				// reference to node
-				Node& node = system.nodes_[i][j][k];
+	for (int ni = 0; ni < system.nodes_.size(); ni++) {
+		// reference to node
+		Node& node = system.nodes_[ni];
 
-				// skip if node has no mass (aka no particles nearby)
-				if (node.mass == 0) {
-					continue;
-				}
-
-				// compute velocity from momentum / mass
-				node.vel /= node.mass;
-
-				// TODO: implement other external forces
-				// Gravity
-				if (parameters.gravityEnabled) {
-					node.force.y() -= parameters.gravityG * node.mass;
-				}
-
-				// update grid velocities
-				node.vel = node.vel + parameters.timestep * node.force / node.mass;
-
-				// enforce boundary conditions
-				// node's position  in world space
-				Vector3d worldPos = Vector3d(i, j, k) * system.dx_;
-
-				// TODO: implement additional boundary conditions
-				// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
-
-				// non-elastic boundaries
-				if (worldPos.x() < system.boundary_			  // left wall
-					|| worldPos.x() > 1 - system.boundary_	// right wall
-					|| worldPos.y() > 1 - system.boundary_	// top wall (ceiling)
-					|| worldPos.z() < system.boundary_		  // back wall
-					|| worldPos.z() > 1 - system.boundary_) { // front wall
-					node.vel.setZero();
-				}
-
-				// elastic boundary
-				if (worldPos.y() < system.boundary_) { // bottom wall (floor)
-					node.vel.y() = std::max(0.0, node.vel.y());
-				}
-			}
+		// skip if node has no mass (aka no particles nearby)
+		if (node.mass == 0) {
+			continue;
 		}
+
+		// compute velocity from momentum / mass
+		node.vel /= node.mass;
+
+		// apply external forces
+		computeGridExtForces(node, system, parameters);
+
+		// update grid velocities
+		node.vel = node.vel + parameters.timestep * node.force / node.mass;
+
+		// process potential collision
+		computeGridCollision(node, system, parameters);
 	}
 }
 
@@ -187,8 +147,7 @@ void Solver::transferG2P(System& system, const SimParameters& parameters)
 					int gridZ = kernel.node0.z() + k;
 
 					// skip if out of bounds
-					if (gridX < 0 || gridY < 0 || gridZ < 0
-						|| gridX >= system.gridSize_ || gridY >= system.gridSize_ || gridZ >= system.gridSize_) {
+					if (!system.isInBounds(gridX, gridY, gridZ)) {
 						continue;
 					}
 
@@ -196,7 +155,7 @@ void Solver::transferG2P(System& system, const SimParameters& parameters)
 					Vector3d weightGradient = kernel.weightGradient(i, j, k);
 
 					// reference to node
-					Node& node = system.nodes_[gridX][gridY][gridZ];
+					Node& node = *system.getNode(gridX, gridY, gridZ);
 
 					// accumulate velocity v_i (eq 175)
 					part.vel += weight * node.vel;
@@ -224,48 +183,94 @@ void Solver::computeParticle(System& system, const SimParameters& parameters)
 		// Advection
 		part.pos += parameters.timestep * part.vel;
 
-		// enforce boundary conditions
-		// TODO: implement additional boundary conditions
-		// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
-
-		//
-		double farBoundary = 1 - system.boundary_;
-
-		// non-elastic boundaries
-		if (part.pos.x() < system.boundary_) // left wall
-		{
-			part.pos(0) = system.boundary_;
-			part.vel(0) = 0;
-		}
-
-		if (part.pos.x() > farBoundary) // right wall
-		{
-			part.pos(0) = farBoundary;
-			part.vel(0) = 0;
-		}
-
-		if (part.pos.z() < system.boundary_) // back wall
-		{
-			part.pos(2) = system.boundary_;
-			part.vel(2) = 0;
-		}
-
-		if (part.pos.z() > farBoundary) // front wall
-		{
-			part.pos(2) = farBoundary;
-			part.vel(2) = 0;
-		}
-
-		if (part.pos.y() > farBoundary) // top wall (ceiling)
-		{
-			part.pos(1) = farBoundary;
-			part.vel(1) = 0;
-		}
-
-		// elastic boundary
-		if (part.pos.y() < system.boundary_) { // bottom wall (floor)
-			part.pos(1)  = system.boundary_;
-			part.vel.y() = std::max(0.0, part.vel.y());
-		}
+		// process potential collision
+		computeParticleCollision(part, system, parameters);
 	}
+}
+
+void Solver::computeGridExtForces(Node& node, const System& system, const SimParameters& parameters)
+{
+	// TODO: implement other external forces
+
+	// Gravity
+	if (parameters.gravityEnabled) {
+		node.force.y() -= parameters.gravityG * node.mass;
+	}
+}
+
+void Solver::computeGridCollision(Node& node, const System& system, const SimParameters& parameters)
+{
+	// TODO: implement additional boundary conditions
+	// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
+
+	// enforce boundary conditions
+
+	// non-elastic boundaries
+	if (node.x < system.boundaryStart_	 // left wall
+		|| node.x > system.boundaryEnd_	// right wall
+		|| node.y > system.boundaryEnd_	// top wall (ceiling)
+		|| node.z < system.boundaryStart_  // back wall
+		|| node.z > system.boundaryEnd_) { // front wall
+		node.vel.setZero();
+	}
+
+	// elastic boundary
+	if (node.y < system.boundaryStart_) { // bottom wall (floor)
+		node.vel.y() = std::max(0.0, node.vel.y());
+	}
+}
+
+void Solver::computeParticleCollision(Particle& part, const System& system, const SimParameters& parameters)
+{
+	// TODO: implement additional boundary conditions
+	// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
+
+	// enforce boundary conditions
+
+	// non-elastic boundaries
+	if (part.pos.x() < system.boundaryStart_) // left wall
+	{
+		part.pos(0) = system.boundaryStart_;
+		part.vel(0) = 0;
+	}
+
+	if (part.pos.x() > system.boundaryEnd_) // right wall
+	{
+		part.pos(0) = system.boundaryEnd_;
+		part.vel(0) = 0;
+	}
+
+	if (part.pos.z() < system.boundaryStart_) // back wall
+	{
+		part.pos(2) = system.boundaryStart_;
+		part.vel(2) = 0;
+	}
+
+	if (part.pos.z() > system.boundaryEnd_) // front wall
+	{
+		part.pos(2) = system.boundaryEnd_;
+		part.vel(2) = 0;
+	}
+
+	if (part.pos.y() > system.boundaryEnd_) // top wall (ceiling)
+	{
+		part.pos(1) = system.boundaryEnd_;
+		part.vel(1) = 0;
+	}
+
+	if (part.pos.y() < system.boundaryStart_) // bottom wall (floor)
+	{
+		part.pos(1) = system.boundaryStart_;
+		part.vel(1) = std::max(0.0, part.vel(1));
+	}
+}
+
+void Solver::clock(unsigned int& current, unsigned int& total, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds>& start)
+{
+	auto end	  = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	start		  = end;
+
+	current = duration.count();
+	total += current;
 }

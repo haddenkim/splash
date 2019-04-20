@@ -8,26 +8,42 @@ class System {
 public:
 	System();
 
-	void clear();
+	void reset(int size);
 	void addCube(int partCount, Eigen::Vector3d center, Eigen::Vector3d velocity, Eigen::RowVector3d color);
 
+	unsigned getNodeIndex(unsigned x, unsigned y, unsigned z) const;
+	Node*	getNode(int x, int y, int z);
+	Node*	getNode(Eigen::Vector3i pos);
+
+	bool isInBounds(double x, double y, double z) const;
+	bool isInBounds(Eigen::Vector3d pos) const;
+
+	void sortParticles();
+
 	// grid dimensions
-	static const int gridSize_ = 51;					// number of nodes in each dimension
-	const double	 dx_	   = 1.0 / (gridSize_ - 1); // ∆x distance between nodes
+	int	gridSize_;  //
+	int	nodeCountX; // number of nodes in each dimension
+	double dx_ = 1;	// ∆x distance between nodes. Simulation is performed entirely in "grid space", so dx is always 1
 
 	// array of particle structs
 	std::vector<Particle> particles_;
 
 	// x , y , z order of grid nodes
-	Node nodes_[gridSize_][gridSize_][gridSize_];
+	std::vector<Node> nodes_;
 
+	// TODO store rigid bodies
+
+	// TODO: create more sophisticated boundary conditions
 	// boundaries
-	double boundary_ = 0.05;
+	int boundaryStart_;
+	int boundaryEnd_;
 
-	// particle modes
+	// particle model
 	ConstitutiveModel constitutiveModel_;
 
 private:
 	//helpers
-	void setupGrid();
+	void setupGrid(int size);
+
+	int nodeCountXY_; // number of nodes in the X Y plane
 };

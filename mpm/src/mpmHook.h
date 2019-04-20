@@ -32,7 +32,9 @@ public:
 	void writePNG(igl::opengl::glfw::Viewer& viewer);
 
 	// libigl render data
-	bool			renderNeedsUpdate_;
+	bool renderNeedsUpdate_;
+	bool renderDataNeedsUpdates_;
+
 	Eigen::MatrixXd particlePositions_;
 	Eigen::MatrixXd particleColors_;
 	Eigen::MatrixXd particleVelocities_;

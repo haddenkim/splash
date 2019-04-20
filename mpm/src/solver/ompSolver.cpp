@@ -3,6 +3,12 @@
 
 using namespace Eigen;
 
+void OmpSolver::reset()
+{
+	// reset bookkeeping
+	activeNodes_.clear();
+}
+
 void OmpSolver::advance(System& system, const SimParameters parameters, Stats& stats)
 {
 	// TODO: find out if this is a no-op when number has not changed, otherwise, need to build some control flow
@@ -69,13 +75,12 @@ void OmpSolver::p2gPreComputeParts(System& system)
 					int gridZ = kernel.node0.z() + k;
 
 					// skip if out of bounds
-					if (gridX < 0 || gridY < 0 || gridZ < 0
-						|| gridX >= system.gridSize_ || gridY >= system.gridSize_ || gridZ >= system.gridSize_) {
+					if (!system.isInBounds(gridX, gridY, gridZ)) {
 						continue;
 					}
 
 					// intentionally allowed race condition
-					system.nodes_[gridX][gridY][gridZ].approxParts++;
+					system.getNode(gridX, gridY, gridZ)->approxParts++;
 				}
 			}
 		}
@@ -89,16 +94,11 @@ void OmpSolver::p2gSetActiveNodes(System& system)
 		std::vector<Node*> localActiveNodes;
 
 #pragma omp for schedule(static) nowait
-		for (int i = 0; i < system.gridSize_; i++) {
-			for (int j = 0; j < system.gridSize_; j++) {
-				for (int k = 0; k < system.gridSize_; k++) {
+		for (int ni = 0; ni < system.nodes_.size(); ni++) {
+			Node* node = &system.nodes_[ni];
 
-					Node* node = &system.nodes_[i][j][k];
-
-					if (node->approxParts != 0) {
-						localActiveNodes.push_back(node);
-					}
-				}
+			if (node->approxParts != 0) {
+				localActiveNodes.push_back(node);
 			}
 		}
 
@@ -131,13 +131,12 @@ void OmpSolver::p2gComputeNodes(System& system)
 					int gridZ = node.z + kk - 1;
 
 					// skip if out of bounds
-					if (gridX < 0 || gridY < 0 || gridZ < 0
-						|| gridX >= system.gridSize_ || gridY >= system.gridSize_ || gridZ >= system.gridSize_) {
+					if (!system.isInBounds(gridX, gridY, gridZ)) {
 						continue;
 					}
 
 					// reference to kernel node
-					const Node& kernelNode = system.nodes_[gridX][gridY][gridZ];
+					const Node& kernelNode = *system.getNode(gridX, gridY, gridZ);
 
 					// loop through particles in kernel node
 					for (int pi : kernelNode.ownedParticles) {
@@ -178,35 +177,14 @@ void OmpSolver::computeGrid(System& system, const SimParameters& parameters)
 		// compute velocity from momentum / mass
 		node.vel /= node.mass;
 
-		// TODO: implement other external forces
-		// Gravity
-		if (parameters.gravityEnabled) {
-			node.force.y() -= parameters.gravityG * node.mass;
-		}
+		// apply external forces
+		computeGridExtForces(node, system, parameters);
 
 		// update grid velocities
 		node.vel = node.vel + parameters.timestep * node.force / node.mass;
 
-		// enforce boundary conditions
-		// node's position  in world space
-		Vector3d worldPos = Vector3d(node.x, node.y, node.z) * system.dx_;
-
-		// TODO: implement additional boundary conditions
-		// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
-
-		// non-elastic boundaries
-		if (worldPos.x() < system.boundary_			  // left wall
-			|| worldPos.x() > 1 - system.boundary_	// right wall
-			|| worldPos.y() > 1 - system.boundary_	// top wall (ceiling)
-			|| worldPos.z() < system.boundary_		  // back wall
-			|| worldPos.z() > 1 - system.boundary_) { // front wall
-			node.vel.setZero();
-		}
-
-		// elastic boundary
-		if (worldPos.y() < system.boundary_) { // bottom wall (floor)
-			node.vel.y() = std::max(0.0, node.vel.y());
-		}
+		// process potential collision
+		computeGridCollision(node, system, parameters);
 	}
 }
 
@@ -236,8 +214,7 @@ void OmpSolver::transferG2P(System& system, const SimParameters& parameters)
 					int gridZ = kernel.node0.z() + k;
 
 					// skip if out of bounds
-					if (gridX < 0 || gridY < 0 || gridZ < 0
-						|| gridX >= system.gridSize_ || gridY >= system.gridSize_ || gridZ >= system.gridSize_) {
+					if (!system.isInBounds(gridX, gridY, gridZ)) {
 						continue;
 					}
 
@@ -245,7 +222,7 @@ void OmpSolver::transferG2P(System& system, const SimParameters& parameters)
 					Vector3d weightGradient = kernel.weightGradient(i, j, k);
 
 					// reference to node
-					Node& node = system.nodes_[gridX][gridY][gridZ];
+					Node& node = *system.getNode(gridX, gridY, gridZ);
 
 					// accumulate velocity v_i (eq 175)
 					part.vel += weight * node.vel;
@@ -279,43 +256,8 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 		// Advection
 		part.pos += parameters.timestep * part.vel;
 
-		// enforce boundary conditions
-		// TODO: implement additional boundary conditions
-		// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
-
-		//
-		double farBoundary = 1 - system.boundary_;
-
-		// non-elastic boundaries
-		if (part.pos.x() < system.boundary_) // left wall
-		{
-			part.pos(0) = system.boundary_;
-			part.vel(0) = 0;
-		}
-
-		if (part.pos.x() > farBoundary) // right wall
-		{
-			part.pos(0) = farBoundary;
-			part.vel(0) = 0;
-		}
-
-		if (part.pos.z() < system.boundary_) // back wall
-		{
-			part.pos(2) = system.boundary_;
-			part.vel(2) = 0;
-		}
-
-		if (part.pos.z() > farBoundary) // front wall
-		{
-			part.pos(2) = farBoundary;
-			part.vel(2) = 0;
-		}
-
-		if (part.pos.y() > farBoundary) // top wall (ceiling)
-		{
-			part.pos(1) = farBoundary;
-			part.vel(1) = 0;
-		}
+		// process potential collision
+		computeParticleCollision(part, system, parameters);
 
 		// update node ownership if needed
 		// current nearest node
@@ -323,13 +265,14 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 
 		// update if different
 		if (newNodeIndex != currentNodeIndex) {
-			Node& currentNode = system.nodes_[currentNodeIndex.x()][currentNodeIndex.y()][currentNodeIndex.z()];
+			Node& currentNode = *system.getNode(currentNodeIndex);
 			omp_set_lock(&currentNode.lock);
 			currentNode.ownedParticles.erase(pi);
 			omp_unset_lock(&currentNode.lock);
 
 			// insert into new node
-			Node& newNode = system.nodes_[newNodeIndex.x()][newNodeIndex.y()][newNodeIndex.z()];
+			system.getNode(newNodeIndex);
+			Node& newNode = *system.getNode(newNodeIndex);
 			omp_set_lock(&newNode.lock);
 			newNode.ownedParticles.insert(pi);
 			omp_unset_lock(&newNode.lock);
