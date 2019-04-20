@@ -34,11 +34,18 @@ void OmpSolver::resetGrid(System& system)
 
 void OmpSolver::transferP2G(System& system, const SimParameters& parameters)
 {
-	// auto start = std::chrono::high_resolution_clock::now();
+	// pre-compute particle values
+	p2gPreComputeParts(system);
 
-	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-	double commonDInvScalar = Interpolation::DInverseScalar(system.dx_);
+	// construct reduced list of active nodes
+	p2gSetActiveNodes(system);
 
+	// transfer to node
+	p2gComputeNodes(system);
+}
+
+void OmpSolver::p2gPreComputeParts(System& system)
+{
 // pre-compute particle values
 #pragma omp parallel for schedule(static)
 	for (int pi = 0; pi < system.particles_.size(); pi++) {
@@ -73,24 +80,24 @@ void OmpSolver::transferP2G(System& system, const SimParameters& parameters)
 			}
 		}
 	}
+}
 
-	// auto end	  = std::chrono::high_resolution_clock::now();
-	// auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	// start		  = end;
-	// printf("after part %li\n", duration.count());
-
-// construct reduced list of active nodes
-#pragma omp parallel for schedule(static)
-	for (int i = 0; i < system.gridSize_; i++) {
+void OmpSolver::p2gSetActiveNodes(System& system)
+{
+#pragma omp parallel
+	{
 		std::vector<Node*> localActiveNodes;
 
-		for (int j = 0; j < system.gridSize_; j++) {
-			for (int k = 0; k < system.gridSize_; k++) {
+#pragma omp for schedule(static) nowait
+		for (int i = 0; i < system.gridSize_; i++) {
+			for (int j = 0; j < system.gridSize_; j++) {
+				for (int k = 0; k < system.gridSize_; k++) {
 
-				Node* node = &system.nodes_[i][j][k];
+					Node* node = &system.nodes_[i][j][k];
 
-				if (node->approxParts != 0) {
-					localActiveNodes.push_back(node);
+					if (node->approxParts != 0) {
+						localActiveNodes.push_back(node);
+					}
 				}
 			}
 		}
@@ -101,11 +108,13 @@ void OmpSolver::transferP2G(System& system, const SimParameters& parameters)
 			activeNodes_.insert(activeNodes_.end(), localActiveNodes.begin(), localActiveNodes.end());
 		}
 	}
+}
 
-	// end		 = std::chrono::high_resolution_clock::now();
-	// duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	// start	= end;
-	// printf("after list %li\n", duration.count());
+void OmpSolver::p2gComputeNodes(System& system)
+{
+
+	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
+	double commonDInvScalar = Interpolation::DInverseScalar(system.dx_);
 
 #pragma omp parallel for schedule(static)
 	for (int ni = 0; ni < activeNodes_.size(); ni++) {
@@ -156,11 +165,6 @@ void OmpSolver::transferP2G(System& system, const SimParameters& parameters)
 			}
 		}
 	}
-
-	// end		 = std::chrono::high_resolution_clock::now();
-	// duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	// start	= end;
-	// printf("after node %li\n", duration.count());
 }
 
 void OmpSolver::computeGrid(System& system, const SimParameters& parameters)
@@ -269,6 +273,9 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 		// update particle deformation gradient components
 		system.constitutiveModel_.updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
 
+		// old nearest node
+		Eigen::Vector3i currentNodeIndex = (part.pos.array() / system.dx_ + 0.5).cast<int>();
+
 		// Advection
 		part.pos += parameters.timestep * part.vel;
 
@@ -311,14 +318,8 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 		}
 
 		// update node ownership if needed
-		// retrieve current node index
-		Eigen::Vector3i currentNodeIndex = part.kernel.node0 + Vector3i::Ones();
-
-		// part position in grid frame
-		Eigen::Vector3d partGridPos = part.pos / system.dx_;
-
-		// insert into nearest node
-		Eigen::Vector3i newNodeIndex = (partGridPos.array() + 0.5).cast<int>();
+		// current nearest node
+		Eigen::Vector3i newNodeIndex = (part.pos.array() / system.dx_ + 0.5).cast<int>();
 
 		// update if different
 		if (newNodeIndex != currentNodeIndex) {

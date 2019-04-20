@@ -14,6 +14,11 @@ protected:
 	void transferG2P(System& system, const SimParameters& parameters) override;
 	void computeParticle(System& system, const SimParameters& parameters) override;
 
+    // helpers
+    void p2gPreComputeParts(System& system);
+    void p2gSetActiveNodes(System& system);
+    void p2gComputeNodes(System& system);
+
 	std::vector<Node*> activeNodes_;
 
 };
