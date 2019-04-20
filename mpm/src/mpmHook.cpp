@@ -1,21 +1,38 @@
 #include "mpmHook.h"
-#include "solver/serialImplicitSolver.h"
-#include "solver/serialSolver.h"
-#include "solver/solver.h"
+#include "solver/ompSolver.h"
+#include "solver/serialImplicitCRSolver.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
 
 using namespace Eigen;
 
-MpmHook::MpmHook()
+MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	: PhysicsHook()
 	, ui_(renderSettings_, simParameters_, stats_, system_)
 {
+	initialShapes_ = initialShapes;
+
+	// available solvers
+	solvers_.emplace_back(new SerialImplicitCRSolver());
+	solvers_.emplace_back(new OmpSolver());
+	solvers_.emplace_back(new Solver());
+
+	// set solver names for gui
+	simParameters_.solverNames = new char*[solvers_.size()];
+	simParameters_.numSolvers  = solvers_.size();
+	for (int i = 0; i < solvers_.size(); i++) {
+
+		std::string name = solvers_[i]->name();
+
+		simParameters_.solverNames[i] = new char[name.size()];
+		strncpy(simParameters_.solverNames[i], name.c_str(), name.size());
+	}
+
 	// bounds
 	{
-		double s = system_.boundary;	 // start
-		double e = 1 - system_.boundary; // end
+		double s = system_.boundary_;	 // start
+		double e = 1 - system_.boundary_; // end
 
 		// x = L(eft) or R(ight)
 		// y = D(own) or U(p)
@@ -53,15 +70,15 @@ MpmHook::MpmHook()
 
 	// grid nodes
 	{
-		int gsize = system_.gridSize * system_.gridSize * system_.gridSize;
+		int gsize = system_.gridSize_ * system_.gridSize_ * system_.gridSize_;
 		gridPositions_.resize(gsize, 3);
 		gridVelocities_.resize(gsize, 3);
 		gridForces_.resize(gsize, 3);
 
 		int gi = 0;
-		for (int i = 0; i < system_.gridSize; i++) {
-			for (int j = 0; j < system_.gridSize; j++) {
-				for (int k = 0; k < system_.gridSize; k++) {
+		for (int i = 0; i < system_.gridSize_; i++) {
+			for (int j = 0; j < system_.gridSize_; j++) {
+				for (int k = 0; k < system_.gridSize_; k++) {
 
 					Vector3d nodePosition			  = Vector3d(i, j, k);
 					gridPositions_.block<1, 3>(gi, 0) = nodePosition;
@@ -72,7 +89,7 @@ MpmHook::MpmHook()
 		}
 
 		// scale
-		gridPositions_ *= system_.dx;
+		gridPositions_ *= system_.dx_;
 	}
 }
 
@@ -86,44 +103,12 @@ void MpmHook::initSimulation()
 	system_.clear();
 	stats_.reset();
 
-	// solver
-	solver_ = new SerialSolver();
-	// solver_ = new SerialImplicitSolver();
-
-	// TODO Engineer process to modify at run time
-
-	// // falling blocks
-	// {
-	// 	system_.addCube(Vector3d(0.5, 0.4, 0.5),
-	// 					Vector3d(0, 0, 0),
-	// 					RowVector3d(1, 0, 1));
-
-	// 	system_.addCube(Vector3d(0.4, 0.6, 0.5),
-	// 					Vector3d(0, 0, 0),
-	// 					RowVector3d(0, 1, 1));
-
-	// 	system_.addCube(Vector3d(0.6, 0.8, 0.5),
-	// 					  Vector3d(0, 0, 0),
-	// 					  RowVector3d(0, 1, 0));
-	// }
-
-	// colliding blocks
-	{
-		system_.addCube(Vector3d(0.2, 0.8, 0.2),
-						Vector3d(10, 0, 10),
-						RowVector3d(0, 1, 1));
-
-		system_.addCube(Vector3d(0.8, 0.7, 0.5),
-						Vector3d(-10, 0, 0),
-						RowVector3d(1, 0, 1));
+	for (const Shape& shape : initialShapes_) {
+		system_.addCube(simParameters_.particlesPerObject,
+						shape.center,
+						shape.velocity,
+						shape.color);
 	}
-
-	// // block to wall
-	// {
-	// 	system_.addCube(Vector3d(0.5, 0.7, 0.5),
-	// 					Vector3d(30, 0, 0),
-	// 					RowVector3d(0, 1, 0));
-	// }
 
 	renderNeedsUpdate_ = true;
 }
@@ -134,9 +119,13 @@ void MpmHook::tick()
 
 bool MpmHook::simulateOneStep()
 {
-	solver_->advance(system_, simParameters_, stats_);
+	solvers_[simParameters_.selectedSolver]->advance(system_, simParameters_, stats_);
 
 	renderNeedsUpdate_ = true;
+
+	if (simParameters_.numSteps == stats_.stepCount) {
+		pause();
+	}
 
 	return false;
 }
@@ -169,9 +158,9 @@ void MpmHook::updateRenderGeometry()
 		// grid
 		{
 			int gi = 0;
-			for (int i = 0; i < system_.gridSize; i++) {
-				for (int j = 0; j < system_.gridSize; j++) {
-					for (int k = 0; k < system_.gridSize; k++) {
+			for (int i = 0; i < system_.gridSize_; i++) {
+				for (int j = 0; j < system_.gridSize_; j++) {
+					for (int k = 0; k < system_.gridSize_; k++) {
 						const Node& node = system_.nodes_[i][j][k];
 
 						gridVelocities_.block<1, 3>(gi, 0) = node.vel;

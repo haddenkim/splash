@@ -1,36 +1,49 @@
 #pragma once
+#include <omp.h>
+#include <string>
+#include <vector>
 
 struct SimParameters {
 	SimParameters()
 	{
 		// default settings
-		timestep =  1e-4;
+		selectedSolver = 0;
+
+		timestep = 1e-4;
+		numSteps = 1000;
+
+		particlesPerObject = 10000;
 
 		gravityEnabled = true;
 		gravityG	   = 200;
 
-		criticalCompression = 2.5e-2;
-		criticalStretch		= 7.5e-3;
-		hardening			= 10.0;
-		E					= 1e4;
-		nu					= 0.2;
+		B				= 1.f;
+		solveTolerance  = 1e-4;
+		solveMaxIters   = 20;
 
-		// compute and store initial mu and lambda (eq 47)
-		mu0		= E / (2 * (1 + nu));
-		lambda0 = E * nu / ((1 + nu) * (1 - 2 * nu));
+		// set max threads
+		numThreads   = omp_get_num_procs();
+		availThreads = numThreads;
 	};
 
+	int	selectedSolver;
+	int	numSolvers;
+	char** solverNames;
+
 	float timestep;
+	int   numSteps;
+
+	int particlesPerObject;
 
 	bool  gravityEnabled;
 	float gravityG;
 
-	// Snow material properties
-	double criticalCompression; // θ_c
-	double criticalStretch;		// θ_s
-	double hardening;			// ξ
-	double E;					// Young's Modulus
-	double nu;					// Poisson ratio
-	double mu0;					// μ shear modulus
-	double lambda0;				// λ Lame's first parameter
+	// implicit solver parameters
+	float B;			   // β interpolation weight
+	int   solveMaxIters;   //
+	float solveTolerance;  // τ
+
+	// OpenMP solver parameters
+	int numThreads;
+	int availThreads;
 };

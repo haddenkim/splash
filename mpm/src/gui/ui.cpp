@@ -10,28 +10,27 @@ UI::UI(RenderSettings& renderSettings,
 	, statsUI_(stats)
 	, systemUI_(system)
 {
-	showParameters_ = false;
+	showParameters_ = true;
 	showRender_		= false;
-	showStats_		= false;
+	showStats_		= true;
 	showSystem_		= false;
 }
 
 void UI::draw()
 {
 	if (ImGui::CollapsingHeader("Additional UI", ImGuiTreeNodeFlags_DefaultOpen)) {
-		ImGui::MenuItem("Renderer", NULL, &showRender_);
 		ImGui::MenuItem("Sim Parameters", NULL, &showParameters_);
+		ImGui::MenuItem("Renderer", NULL, &showRender_);
 		ImGui::MenuItem("Stats", NULL, &showStats_);
 		ImGui::MenuItem("System", NULL, &showSystem_);
 	}
 
-	if (showRender_) {
-		renderUI_.draw();
-	}
 	if (showParameters_) {
 		parametersUI_.draw();
 	}
-
+	if (showRender_) {
+		renderUI_.draw();
+	}
 	if (showStats_) {
 		statsUI_.draw();
 	}

@@ -7,12 +7,16 @@
 
 class Solver {
 public:
-	virtual void advance(System& system, const SimParameters parameters, Stats& stats) = 0;
+	virtual std::string name() { return "Default"; };
 
-	void clock(int& dest, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds> start)
-	{
-		auto end		= std::chrono::high_resolution_clock::now();
-		auto duration   = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		dest = duration.count();
-	}
+	virtual void advance(System& system, const SimParameters parameters, Stats& stats);
+
+	void clock(unsigned int& current, unsigned int& total, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds>& start);
+
+protected:
+	virtual void resetGrid(System& system);
+	virtual void transferP2G(System& system, const SimParameters& parameters);
+	virtual void computeGrid(System& system, const SimParameters& parameters);
+	virtual void transferG2P(System& system, const SimParameters& parameters);
+	virtual void computeParticle(System& system, const SimParameters& parameters);
 };

@@ -4,14 +4,16 @@
 #include "settings/simParameters.h"
 #include "settings/stats.h"
 #include "state/particle.h"
+#include "state/shape.h"
 #include "state/system.h"
 #include <Eigen/Core>
+#include <initializer_list>
 
 class Solver;
 
 class MpmHook : public PhysicsHook {
 public:
-	MpmHook();
+	MpmHook(std::initializer_list<Shape> initialShapes);
 
 	void drawGUI() override;
 
@@ -30,7 +32,7 @@ public:
 	void writePNG(igl::opengl::glfw::Viewer& viewer);
 
 	// libigl render data
-	bool renderNeedsUpdate_;
+	bool			renderNeedsUpdate_;
 	Eigen::MatrixXd particlePositions_;
 	Eigen::MatrixXd particleColors_;
 	Eigen::MatrixXd particleVelocities_;
@@ -42,10 +44,11 @@ public:
 	Eigen::MatrixXd gridBorders_;
 
 	// simulation state
-	System system_;
+	std::vector<Shape> initialShapes_;
+	System			   system_;
 
-	// solver
-	Solver* solver_;
+	// solvers
+	std::vector<Solver*> solvers_;
 
 	// settings + stats
 	SimParameters  simParameters_;
