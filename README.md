@@ -14,7 +14,8 @@ Splash uses [libigl](https://libigl.github.io/) for rendering.
 
 ## Features/TODO
 * [x] Serial Explicit MPM
-* [ ] Serial Implicit MPM
+* [x] Serial Implicit MPM
+* [x] OpenMP Explicit MPM
 * [ ] OpenMP Implicit MPM
 * [ ] MPI Implicit MPM
 
@@ -29,16 +30,16 @@ cd lib
 git clone https://github.com/libigl/libigl.git
 ```
 
-### MacOS & Linux
+### Linux
 ```
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
-I tested compiling with GCC 7.3 on Ubuntu 18.
+I tested compiling with GCC 7.3 and ICC 19.0 on Ubuntu 18.
 
-### Windows
+### Windows & MacOS
 Untested. 
 
 ## Usage
