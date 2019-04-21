@@ -5,7 +5,6 @@ class OmpSolver : public Solver {
 public:
 	std::string name() override { return "OpenMP"; };
 
-	void reset() override;
 	void advance(System& system, const SimParameters parameters, Stats& stats) override;
 
 protected:
@@ -20,5 +19,4 @@ protected:
 	void p2gSetActiveNodes(System& system);
 	void p2gComputeNodes(System& system);
 
-	std::vector<Node*> activeNodes_;
 };

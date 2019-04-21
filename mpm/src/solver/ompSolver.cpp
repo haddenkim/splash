@@ -3,12 +3,6 @@
 
 using namespace Eigen;
 
-void OmpSolver::reset()
-{
-	// reset bookkeeping
-	activeNodes_.clear();
-}
-
 void OmpSolver::advance(System& system, const SimParameters parameters, Stats& stats)
 {
 	// TODO: find out if this is a no-op when number has not changed, otherwise, need to build some control flow

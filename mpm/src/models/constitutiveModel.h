@@ -4,6 +4,12 @@
 
 class ConstitutiveModel {
 public:
+	// computes the elastic potential energy
+	virtual double computePotentialEnergy(const Eigen::Matrix3d& F_E,
+										  const Eigen::Matrix3d& R_E,
+										  const Eigen::Matrix3d& F_P,
+										  double				 vol0) const = 0;
+
 	// computes and updates the needed deformation gradients
 	virtual void updateDeformDecomp(Eigen::Matrix3d&	   F_E,
 									Eigen::Matrix3d&	   R_E,

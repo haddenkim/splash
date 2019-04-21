@@ -5,6 +5,8 @@ using namespace Eigen;
 
 void Solver::reset()
 {
+	// reset bookkeeping
+	activeNodes_.clear();
 }
 
 void Solver::advance(System& system, const SimParameters parameters, Stats& stats)
@@ -31,6 +33,12 @@ void Solver::advance(System& system, const SimParameters parameters, Stats& stat
 	// log stats
 	stats.simTime += parameters.timestep;
 	stats.stepCount++;
+
+	if (stats.trackEnergy) {
+		computeTotalEnergy(stats, system);
+	}
+
+	additionalStats(stats, system);
 }
 
 void Solver::resetGrid(System& system)
@@ -273,4 +281,21 @@ void Solver::clock(unsigned int& current, unsigned int& total, std::chrono::time
 
 	current = duration.count();
 	total += current;
+}
+
+void Solver::computeTotalEnergy(Stats& stats, const System& system)
+{
+	stats.totalKineticEnergy   = 0;
+	stats.totalPotentialEnergy = 0;
+
+	for (const Particle& part : system.particles_) {
+		// kinetic energy
+		stats.totalKineticEnergy += 0.5 * part.mass0 * part.vel.squaredNorm();
+		stats.totalPotentialEnergy += part.model->computePotentialEnergy(part.F_E, part.R_E, part.F_P, part.vol0);
+	}
+}
+
+
+void Solver::additionalStats(Stats& stats, const System& system)
+{
 }

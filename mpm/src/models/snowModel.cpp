@@ -18,6 +18,23 @@ SnowModel::SnowModel(double thetaC,
 	lambda0_ = E0 * nu / ((1 + nu) * (1 - 2 * nu));
 }
 
+double SnowModel::computePotentialEnergy(const Eigen::Matrix3d& F_E,
+										 const Eigen::Matrix3d& R_E,
+										 const Eigen::Matrix3d& F_P,
+										 double					vol0) const
+{
+	double J_E = F_P.determinant();
+	double J_P = F_P.determinant();
+
+	// compute current mu and lambda (eq 87)
+	double mu;
+	double lambda;
+	computeMuLambda(mu, lambda, J_P);
+
+	// (stom eq  1)
+	return mu * (F_E - R_E).squaredNorm() + 0.5 * lambda * (J_E - 1) * (J_E - 1);
+}
+
 void SnowModel::updateDeformDecomp(Eigen::Matrix3d&		  F_E,
 								   Eigen::Matrix3d&		  R_E,
 								   Eigen::Matrix3d&		  F_P,

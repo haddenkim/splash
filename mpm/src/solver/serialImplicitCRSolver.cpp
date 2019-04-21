@@ -84,6 +84,9 @@ void SerialImplicitCRSolver::computeGrid(System& system, const SimParameters& pa
 		CR_x		 = CR_x + alpha * CR_p;		  // x_k+1
 		CR_r		 = CR_r - alpha * CR_Ap;	  // r_k+1
 
+		// log stats
+		statsResidual_[k] = CR_r.norm();
+
 		// check tolerance
 		if (CR_r.norm() < parameters.solveTolerance) {
 			break;
@@ -96,6 +99,10 @@ void SerialImplicitCRSolver::computeGrid(System& system, const SimParameters& pa
 		CR_p		= CR_r + beta * CR_p;		// p_k+1
 		CR_Ap		= CR_Ar + beta * CR_Ap;		// Ap_k+1
 	}
+
+	// stats
+	statsNumSteps_		= k;
+	statsFinalResidual_ = CR_r.norm();
 
 	// printf("final k: %i \tr.norm: %f\n", k, CR_r.norm());
 
@@ -261,4 +268,15 @@ Eigen::Vector3d SerialImplicitCRSolver::computeHessianAction(const Node& node, c
 	}
 
 	return hessianAction;
+}
+
+void SerialImplicitCRSolver::additionalStats(Stats& stats, const System& system)
+{
+	stats.solveSteps		 = statsNumSteps_;
+	stats.solveFinalResidual = statsFinalResidual_;
+	for (int i = 0; i < 30; i++) {
+		stats.solveResidual[i] = statsResidual_[i];
+
+		statsResidual_[i] = 0;
+	}
 }

@@ -6,6 +6,12 @@ public:
 	// Drucker-Prager sand
 	SandModel();
 
+	// computes the elastic potential energy
+	double computePotentialEnergy(const Eigen::Matrix3d& F_E,
+								  const Eigen::Matrix3d& R_E,
+								  const Eigen::Matrix3d& F_P,
+								  double				 vol0) const override;
+
 	// computes and updates the needed deformation gradients
 	void updateDeformDecomp(Eigen::Matrix3d&	   F_E,
 							Eigen::Matrix3d&	   R_E,

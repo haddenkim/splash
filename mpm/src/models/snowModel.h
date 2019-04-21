@@ -10,6 +10,12 @@ public:
 			  double E0		= 1.4e5,  // E_0 initial Young's Modulus
 			  double nu		= 0.2);		  // ν Poisson ratio
 
+	// computes the elastic potential energy
+	double computePotentialEnergy(const Eigen::Matrix3d& F_E,
+								  const Eigen::Matrix3d& R_E,
+								  const Eigen::Matrix3d& F_P,
+								  double				 vol0) const override;
+
 	// computes and updates the needed deformation gradients
 	void updateDeformDecomp(Eigen::Matrix3d&	   F_E,
 							Eigen::Matrix3d&	   R_E,

@@ -18,6 +18,11 @@ private:
 	void			computeParticleVAFTs(System& system);
 	Eigen::Vector3d computeHessianAction(const Node& node, const System& system);
 
-	// time integration bookkeeping
-	std::vector<Node*> activeNodes_;
+	// analysis
+	void additionalStats(Stats& stats, const System& system) override;
+
+	// stats
+	int   statsNumSteps_;
+	float statsFinalResidual_;
+	float statsResidual_[30];
 };

@@ -24,5 +24,10 @@ protected:
 	virtual void computeGridCollision(Node& node, const System& system, const SimParameters& parameters);
 	virtual void computeParticleCollision(Particle& part, const System& system, const SimParameters& parameters);
 
+	// analysis
 	void clock(unsigned int& current, unsigned int& total, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds>& start);
+	void computeTotalEnergy(Stats& stats, const System& system);
+	virtual void additionalStats(Stats& stats, const System& system);
+
+	std::vector<Node*> activeNodes_;
 };

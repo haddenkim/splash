@@ -4,10 +4,10 @@
 
 class StatsUI {
 public:
-	StatsUI(const Stats& stats);
+	StatsUI(Stats& stats);
 
 	void draw();
 
 private:
-	const Stats& stats_;
+	Stats& stats_;
 };

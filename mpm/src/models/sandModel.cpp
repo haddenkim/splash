@@ -6,6 +6,14 @@ SandModel::SandModel()
 {
 }
 
+double SandModel::computePotentialEnergy(const Eigen::Matrix3d& F_E,
+										 const Eigen::Matrix3d& R_E,
+										 const Eigen::Matrix3d& F_P,
+										 double					vol0) const
+{
+	return 0;
+}
+
 void SandModel::updateDeformDecomp(Eigen::Matrix3d&		  F_E,
 								   Eigen::Matrix3d&		  R_E,
 								   Eigen::Matrix3d&		  F_P,
