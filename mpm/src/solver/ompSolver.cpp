@@ -57,7 +57,7 @@ void OmpSolver::p2gPreComputeParts(System& system)
 	for (int pi = 0; pi < system.particles_.size(); pi++) {
 		Particle& part = system.particles_[pi];
 		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
-		part.VPFT = system.constitutiveModel_.computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
+		part.VPFT = part.model->computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
 
 		// compute the particle's kernel
 		Interpolation& kernel = part.kernel;
@@ -248,7 +248,7 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 		Particle& part = system.particles_[pi];
 
 		// update particle deformation gradient components
-		system.constitutiveModel_.updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
+		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
 
 		// old nearest node
 		Eigen::Vector3i currentNodeIndex = (part.pos.array() / system.dx_ + 0.5).cast<int>();

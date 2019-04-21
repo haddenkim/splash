@@ -1,11 +1,13 @@
 #pragma once
-#include "models/interpolation.h"
+#include "kernels/interpolation.h"
+#include "models/constitutiveModel.h"
 #include <Eigen/Core>
 
 struct Particle {
-	Particle(Eigen::Vector3d x, Eigen::Vector3d v, Eigen::RowVector3d color)
+	Particle(Eigen::Vector3d x, Eigen::Vector3d v, ConstitutiveModel* model, Eigen::RowVector3d color)
 		: pos(x)
 		, vel(v)
+		, model(model)
 		, color(color)
 	{
 		// TODO engineer way to vary these parameters or compute them (ex. FEM style eq 136-155)
@@ -23,6 +25,7 @@ struct Particle {
 	Eigen::RowVector3d color; // rendering color
 	double			   mass0; // intial mass
 	double			   vol0;  // initial volume
+	ConstitutiveModel* model; //
 
 	// time dependent
 	Eigen::Vector3d pos; // position
@@ -43,5 +46,4 @@ struct Particle {
 
 	// only used by implicit solvers
 	Eigen::Matrix3d VAFT; // V_p * A_p * (F_p)^T (eq 196)
-
 };

@@ -38,8 +38,8 @@ public:
 	int boundaryStart_;
 	int boundaryEnd_;
 
-	// particle model
-	ConstitutiveModel constitutiveModel_;
+	// particle model(s)
+	std::vector<ConstitutiveModel*> constitutiveModels;
 
 private:
 	//helpers

@@ -15,7 +15,7 @@ void Interpolation::compute(Eigen::Vector3d position, double dx)
 	// For now all functions here implement Quadradic B-spline interpolation (eq 123)
 
 	// part position in grid frame
-	Eigen::Vector3d partGridPos = position / dx;
+	Eigen::Vector3d partGridPos = position ;
 
 	// lowest node position in grid frame of part's kernel
 	node0 = (partGridPos.array() - 0.5).cast<int>();
@@ -31,9 +31,9 @@ void Interpolation::compute(Eigen::Vector3d position, double dx)
 
 	// compute weight gradient components ∇w_aip / h
 	Eigen::Vector3d wGrad_HComps[3];
-	wGrad_HComps[0] = (vecI0P.array() - 1.5) / dx;			// start node
-	wGrad_HComps[1] = (-2.0 * (vecI0P.array() - 1.0)) / dx; // middle node
-	wGrad_HComps[2] = (vecI0P.array() - 0.5) / dx;			// end node
+	wGrad_HComps[0] = (vecI0P.array() - 1.5) ;			// start node
+	wGrad_HComps[1] = (-2.0 * (vecI0P.array() - 1.0)) ; // middle node
+	wGrad_HComps[2] = (vecI0P.array() - 0.5);			// end node
 
 	// compute per node weight and weight gradient ∇w_aip
 	for (int i = 0; i < 3; i++) {
@@ -69,5 +69,5 @@ Eigen::Vector3d Interpolation::vecPI(int i, int j, int k) const
 double Interpolation::DInverseScalar(double dx)
 {
 	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-	return 4.0 / dx / dx; // (1/4 * (∆x)^2 * I)^-1
+	return 4.0 ; // (1/4 * (∆x)^2 * I)^-1
 }

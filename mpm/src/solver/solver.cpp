@@ -1,5 +1,5 @@
 #include "solver.h"
-#include "models/interpolation.h"
+#include "kernels/interpolation.h"
 #include <Eigen/Dense>
 using namespace Eigen;
 
@@ -51,7 +51,7 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 		Particle& part = system.particles_[pi];
 
 		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
-		part.VPFT = system.constitutiveModel_.computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
+		part.VPFT = part.model->computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
 
 		// compute the particle's kernel
 		Interpolation& kernel = part.kernel;
@@ -82,7 +82,7 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 					node.mass += weight * part.mass0;
 
 					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = kernel.vecPI(i, j, k) * system.dx_;
+					Vector3d vecPI = kernel.vecPI(i, j, k);
 
 					// accumulate momentum (eq. 173)
 					// stores in node velocity, next mpm step computes velocity from momentum
@@ -161,12 +161,12 @@ void Solver::transferG2P(System& system, const SimParameters& parameters)
 					part.vel += weight * node.vel;
 
 					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = kernel.vecPI(i, j, k) * system.dx_;
+					Vector3d vecPI = kernel.vecPI(i, j, k);
 
 					// acculumate affine state B_i (eq 176)
 					part.B += weight * node.vel * vecPI.transpose();
 
-					// accumulate node's deformation update (eq 181)
+					// accumulate node's deformation update (eq 181) aka velocity gradient
 					part.velGradient += node.vel * weightGradient.transpose();
 				}
 			}
@@ -178,7 +178,7 @@ void Solver::computeParticle(System& system, const SimParameters& parameters)
 {
 	for (Particle& part : system.particles_) {
 		// update particle deformation gradient components
-		system.constitutiveModel_.updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
+		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
 
 		// Advection
 		part.pos += parameters.timestep * part.vel;

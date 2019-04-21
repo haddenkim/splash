@@ -1,13 +1,18 @@
 #include "system.h"
-#include "state/node.h"
+#include "models/sandModel.h"
+#include "models/snowModel.h"
 #include <Eigen/Dense>
 #include <algorithm>
 
 using namespace Eigen;
 
 System::System()
-	: constitutiveModel_()
 {
+	// snow 0
+	constitutiveModels.emplace_back(new SnowModel());
+
+	// sand 1
+	constitutiveModels.emplace_back(new SandModel());
 }
 
 void System::reset(int size)
@@ -27,6 +32,9 @@ void System::reset(int size)
 
 void System::addCube(int partCount, Vector3d center, Vector3d velocity, RowVector3d color)
 {
+	// retrieve model
+	ConstitutiveModel* model = constitutiveModels[0];
+
 	double diameter = (double)gridSize_ / 10;
 
 	for (int i = 0; i < partCount; i++) {
@@ -38,7 +46,7 @@ void System::addCube(int partCount, Vector3d center, Vector3d velocity, RowVecto
 
 		position = position * diameter + center * gridSize_;
 
-		particles_.emplace_back(Particle(position, velocity, color));
+		particles_.emplace_back(Particle(position, velocity, model, color));
 
 		// position of nearest node
 		Eigen::Vector3i nodePos = (position.array() + 0.5).cast<int>();
@@ -125,6 +133,21 @@ void System::sortParticles()
 		Eigen::Vector3i bNode = (b.pos.array() + 0.5).cast<int>();
 
 		return getNodeIndex(aNode.x(), aNode.y(), aNode.z()) > getNodeIndex(bNode.x(), bNode.y(), bNode.z());
-
 	});
+
+	// re-assign node ownership
+	for (Node& node : nodes_) {
+		node.ownedParticles.clear();
+	}
+
+	for (int pi = 0; pi < particles_.size(); pi++) {
+		const Particle& part = particles_[pi];
+
+		// position of nearest node
+		Eigen::Vector3i nodePos = (part.pos.array() + 0.5).cast<int>();
+
+		// add to node's list
+		Node* node = getNode(nodePos);
+		node->ownedParticles.insert(pi);
+	}
 }
