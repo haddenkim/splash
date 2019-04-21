@@ -1,5 +1,6 @@
 #include "mpmHook.h"
 #include "solver/ompSolver.h"
+#include "solver/serialImplicitCRSolver.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
@@ -13,9 +14,9 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	initialShapes_ = initialShapes;
 
 	// available solvers
-	// solvers_.emplace_back(new SerialImplicitCRSolver());
 	solvers_.emplace_back(new OmpSolver());
 	solvers_.emplace_back(new Solver());
+	solvers_.emplace_back(new SerialImplicitCRSolver());
 
 	// set solver names for gui
 	simParameters_.solverNames = new char*[solvers_.size()];

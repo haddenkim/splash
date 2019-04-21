@@ -151,7 +151,7 @@ void OmpSolver::p2gComputeNodes(System& system)
 						node.mass += weight * part.mass0;
 
 						// compute vector from part to node in world frame (x_i - x_p)
-						Vector3d vecPI = kernel.vecPI(2 - ki, 2 - kj, 2 - kk) * system.dx_;
+						Vector3d vecPI = kernel.vecPI(2 - ki, 2 - kj, 2 - kk);
 
 						// accumulate momentum (eq. 173)
 						// stores in node velocity, next mpm step computes velocity from momentum
@@ -228,7 +228,7 @@ void OmpSolver::transferG2P(System& system, const SimParameters& parameters)
 					part.vel += weight * node.vel;
 
 					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = kernel.vecPI(i, j, k) * system.dx_;
+					Vector3d vecPI = kernel.vecPI(i, j, k);
 
 					// acculumate affine state B_i (eq 176)
 					part.B += weight * node.vel * vecPI.transpose();
@@ -251,7 +251,7 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
 
 		// old nearest node
-		Eigen::Vector3i currentNodeIndex = (part.pos.array() / system.dx_ + 0.5).cast<int>();
+		Eigen::Vector3i currentNodeIndex = (part.pos.array() + 0.5).cast<int>();
 
 		// Advection
 		part.pos += parameters.timestep * part.vel;
@@ -261,7 +261,7 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 
 		// update node ownership if needed
 		// current nearest node
-		Eigen::Vector3i newNodeIndex = (part.pos.array() / system.dx_ + 0.5).cast<int>();
+		Eigen::Vector3i newNodeIndex = (part.pos.array() + 0.5).cast<int>();
 
 		// update if different
 		if (newNodeIndex != currentNodeIndex) {

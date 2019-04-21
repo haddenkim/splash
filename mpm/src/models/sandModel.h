@@ -25,4 +25,10 @@ public:
 														  const Eigen::Matrix3d& F_E,
 														  const double&			 J_P) const override;
 
+private:
+	// helper
+	void project(Eigen::Matrix3d& F_E, double& alpha) const;
+
+	double mu0_;	 // μ shear modulus
+	double lambda0_; // λ Lame's first parameter
 };
