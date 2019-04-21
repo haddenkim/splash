@@ -45,5 +45,5 @@ struct Particle {
 	Eigen::Matrix3d velGradient; // accumulation of ∇v_p = Σ_i(v_i * ∇w_ip) (eq 181) (stomakhin step 7)
 
 	// only used by implicit solvers
-	Eigen::Matrix3d VAFT; // V_p * A_p * (F_p)^T (eq 196)
+	Eigen::Matrix3d VAFT;	// V_p * A_p * (F_p)^T (eq 196)
 };

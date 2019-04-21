@@ -43,15 +43,6 @@ void SerialImplicitCRSolver::computeGrid(System& system, const SimParameters& pa
 		CR_x.segment<3>(3 * ni) = node.vel;
 	}
 
-	// set initial δu on each node
-	// using explicit next velocity as initial guess
-	for (int ni = 0; ni < activeNodes_.size(); ni++) {
-		Node& node = *activeNodes_[ni];
-
-		node.differentialU		= node.vel * parameters.timestep;
-		CR_x.segment<3>(3 * ni) = node.vel;
-	}
-
 	// compute r_0
 	computeAx(CR_r, system, CR_x, parameters);
 	CR_r = CR_x - CR_r;
@@ -197,6 +188,9 @@ void SerialImplicitCRSolver::computeParticleVAFTs(System& system)
 		// accumulate D matrix (eq 197) aka δF (eq 53)
 		Matrix3d differentailF_E = Matrix3d::Zero();
 
+		// reset velocity gradient
+		part.velGradient.setZero();
+
 		// loop through kernel nodes
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {
@@ -217,14 +211,20 @@ void SerialImplicitCRSolver::computeParticleVAFTs(System& system)
 					// reference to node
 					Node& node = *system.getNode(gridX, gridY, gridZ);
 
+					// accumulate ∇v_p for F̂_E (eq 193)
+					part.velGradient += node.differentialU * weightGradient.transpose();
+
 					// accumulate D matrix (eq 197)
 					differentailF_E += node.differentialU * weightGradient.transpose() * part.F_E;
 				}
 			}
 		}
 
+		// compute  F̂_E (eq 197)
+		Eigen::Matrix3d F_E_hat = (Matrix3d::Identity() + part.velGradient) * part.F_E;
+
 		// compute A_p (eq 197) aka δP (eq 56)
-		Matrix3d A = part.model->computeFirstPiolaKirchoffDifferential(differentailF_E, part.F_E, part.J_P);
+		Matrix3d A = part.model->computeFirstPiolaKirchoffDifferential(differentailF_E, F_E_hat, part.J_P);
 
 		// compute V A F^T (eq 196)
 		part.VAFT = part.vol0 * A * part.F_E.transpose();
