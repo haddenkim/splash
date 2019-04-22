@@ -132,11 +132,11 @@ void SerialImplicitCRSolver::computeParticle(System& system, const SimParameters
 		// update if different
 		if (newNodeIndex != currentNodeIndex) {
 			Node& currentNode = *system.getNode(currentNodeIndex);
-			currentNode.ownedParticles.erase(pi);
+			currentNode.ownedParticles.erase(&system.particles_[pi]);
 
 			// insert into new node
 			Node& newNode = *system.getNode(newNodeIndex);
-			newNode.ownedParticles.insert(pi);
+			newNode.ownedParticles.insert(&system.particles_[pi]);
 		}
 	}
 }
@@ -255,13 +255,11 @@ Eigen::Vector3d SerialImplicitCRSolver::computeHessianAction(const Node& node, c
 				// const Node& kernelNode = *system.getNode(gridX, gridY, gridZ);
 
 				// loop through particles in kernel node
-				for (int pi : kernelNode.ownedParticles) {
-
-					const Particle& part		   = system.particles_[pi];
-					Vector3d		weightGradient = part.kernel.weightGradient(2 - ki, 2 - kj, 2 - kk);
+				for (Particle* part : kernelNode.ownedParticles) {
+					Vector3d		weightGradient = part->kernel.weightGradient(2 - ki, 2 - kj, 2 - kk);
 
 					// accumulate hessian action aka differential force δf (eq 196)
-					hessianAction -= part.VAFT * weightGradient;
+					hessianAction -= part->VAFT * weightGradient;
 				}
 			}
 		}

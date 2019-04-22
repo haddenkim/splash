@@ -30,8 +30,7 @@ struct Particle {
 	// time dependent
 	Eigen::Vector3d pos; // position
 	Eigen::Vector3d vel; // velocity
-
-	Eigen::Matrix3d B; // affine state
+	Eigen::Matrix3d B;   // affine state
 
 	Eigen::Matrix3d F_E; // elastic part of deformation gradient F
 	Eigen::Matrix3d F_P; // plastic part of deformation gradient F
@@ -45,5 +44,5 @@ struct Particle {
 	Eigen::Matrix3d velGradient; // accumulation of ∇v_p = Σ_i(v_i * ∇w_ip) (eq 181) (stomakhin step 7)
 
 	// only used by implicit solvers
-	Eigen::Matrix3d VAFT;	// V_p * A_p * (F_p)^T (eq 196)
+	Eigen::Matrix3d VAFT; // V_p * A_p * (F_p)^T (eq 196)
 };

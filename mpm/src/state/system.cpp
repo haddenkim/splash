@@ -52,8 +52,8 @@ void System::addCube(int partCount, Vector3d center, Vector3d velocity, RowVecto
 		Eigen::Vector3i nodePos = (position.array() + 0.5).cast<int>();
 
 		// add to node's list
-		Node* node = getNode(nodePos);
-		node->ownedParticles.insert(pi);
+		// Node* node = getNode(nodePos);
+		// node->ownedParticles.insert(pi);
 	}
 }
 
@@ -95,35 +95,22 @@ Node* System::getNode(Eigen::Vector3i pos)
 	return getNode(pos.x(), pos.y(), pos.z());
 }
 
+Node* System::getNode(Eigen::Vector3d pos)
+{
+	// position of nearest node
+	Eigen::Vector3i nodePos = (pos.array() + 0.5).cast<int>();
+
+	return getNode(nodePos);
+}
+
 bool System::isInBounds(double x, double y, double z) const
 {
-	return x >= 0 || y >= 0 || z >= 0 || x < gridSize_ || y < gridSize_ || z < gridSize_;
+	return x >= 0 && y >= 0 && z >= 0 && x < gridSize_ && y < gridSize_ && z < gridSize_;
 }
 
 bool System::isInBounds(Eigen::Vector3d pos) const
 {
 	return isInBounds(pos.x(), pos.y(), pos.z());
-}
-
-void System::setupGrid(int size)
-{
-	nodes_ = std::vector<Node>(nodeCountX * nodeCountX * nodeCountX);
-
-	// set every node's grid position
-	int ni;
-	for (int i = 0; i < nodeCountX; i++) {
-		for (int j = 0; j < nodeCountX; j++) {
-			for (int k = 0; k < nodeCountX; k++) {
-
-				int   ni   = getNodeIndex(i, j, k);
-				Node& node = nodes_[ni];
-
-				node.x = i;
-				node.y = j;
-				node.z = k;
-			}
-		}
-	}
 }
 
 void System::sortParticles()
@@ -148,6 +135,46 @@ void System::sortParticles()
 
 		// add to node's list
 		Node* node = getNode(nodePos);
-		node->ownedParticles.insert(pi);
+		node->ownedParticles.insert(&particles_[pi]);
+	}
+}
+
+void System::setupGrid(int size)
+{
+	nodes_ = std::vector<Node>(nodeCountX * nodeCountX * nodeCountX);
+
+	// set every node's grid position
+	int ni;
+	for (int i = 0; i < nodeCountX; i++) {
+		for (int j = 0; j < nodeCountX; j++) {
+			for (int k = 0; k < nodeCountX; k++) {
+
+				int   ni   = getNodeIndex(i, j, k);
+				Node& node = nodes_[ni];
+
+				// position
+				node.x = i;
+				node.y = j;
+				node.z = k;
+
+				// neighbors
+				for (int ki = 0; ki < 3; ki++) {
+					for (int kj = 0; kj < 3; kj++) {
+						for (int kk = 0; kk < 3; kk++) {
+							// compute neighbor position
+							int kx = i + ki - 1;
+							int ky = j + kj - 1;
+							int kz = k + kk - 1;
+
+							// index in neighbor list
+							int index = ki * 9 + kj * 3 + kk;
+
+							// add to neighbor list (or nullptr if out of bounds)
+							node.neighbors[index] = isInBounds(kx, ky, kz) ? getNode(kx, ky, kz) : nullptr;
+						}
+					}
+				}
+			}
+		}
 	}
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include <Eigen/Core>
+#include <array>
 #include <omp.h>
 #include <set>
 #include <vector>
@@ -12,20 +13,18 @@ struct Node {
 	int y;
 	int z;
 
+	// 3x3x3 block in x->y->z order of neighbors, including self
+	std::array<Node*, 27> neighbors;
+
 	// time dependent
 	Eigen::Vector3d vel; // velocity
 	Eigen::Vector3d force;
-
-	// time integration bookkeeping
-	double mass;
+	double			mass;
 
 	// for node first P2G
-	std::set<int> ownedParticles;
+	std::set<Particle*> ownedParticles;
 
 	// only used by implicit solvers
-	// std::vector<int>			 particles;		  // nearby particles that contibute to this node
-	// std::vector<Eigen::Vector3d> weightGradients; // per particle
-
 	Eigen::Vector3d differentialU; // δu aka δvelocity
 
 	// only used by openMP solver

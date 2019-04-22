@@ -57,26 +57,17 @@ void OmpSolver::p2gPreComputeParts(System& system)
 		Interpolation& kernel = part.kernel;
 		kernel.compute(part.pos, system.dx_);
 
-		// flag nodes as active
-		// loop through kernel nodes
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				for (int k = 0; k < 3; k++) {
+		// owning node
+		Node& node = *system.getNode(part.pos);
 
-					// compute grid frame coordinates of this node
-					int gridX = kernel.node0.x() + i;
-					int gridY = kernel.node0.y() + j;
-					int gridZ = kernel.node0.z() + k;
-
-					// skip if out of bounds
-					if (!system.isInBounds(gridX, gridY, gridZ)) {
-						continue;
-					}
-
-					// intentionally allowed race condition
-					system.getNode(gridX, gridY, gridZ)->approxParts++;
-				}
+		// flag all neighbor nodes as active
+		for (Node* kernelNode : node.neighbors) {
+			if (kernelNode == nullptr) {
+				continue;
 			}
+
+			// intentionally allowed race condition
+			kernelNode->approxParts++;
 		}
 	}
 }
@@ -116,45 +107,35 @@ void OmpSolver::p2gComputeNodes(System& system)
 		Node& node = *activeNodes_[ni];
 
 		// loop through all the nodes in the kernel (aka all neighboring nodes)
-		for (int ki = 0; ki < 3; ki++) {
-			for (int kj = 0; kj < 3; kj++) {
-				for (int kk = 0; kk < 3; kk++) {
-					// compute grid frame coordinates of kernel node
-					int gridX = node.x + ki - 1;
-					int gridY = node.y + kj - 1;
-					int gridZ = node.z + kk - 1;
+		for (Node* kernelNode : node.neighbors) {
+			if (kernelNode == nullptr) {
+				continue;
+			}
 
-					// skip if out of bounds
-					if (!system.isInBounds(gridX, gridY, gridZ)) {
-						continue;
-					}
+			// node's position relative to particle's kernel
+			int ki = node.x - kernelNode->x + 1;
+			int kj = node.y - kernelNode->y + 1;
+			int kk = node.z - kernelNode->z + 1;
 
-					// reference to kernel node
-					const Node& kernelNode = *system.getNode(gridX, gridY, gridZ);
+			// loop through particles in kernel node
+			for (Particle* part : kernelNode->ownedParticles) {
+				const Interpolation& kernel = part->kernel;
 
-					// loop through particles in kernel node
-					for (int pi : kernelNode.ownedParticles) {
+				double   weight			= kernel.weight(ki, kj, kk);
+				Vector3d weightGradient = kernel.weightGradient(ki, kj, kk);
 
-						const Particle&		 part   = system.particles_[pi];
-						const Interpolation& kernel = part.kernel;
+				// accumulate mass (eq. 172)
+				node.mass += weight * part->mass0;
 
-						double   weight			= part.kernel.weight(2 - ki, 2 - kj, 2 - kk);
-						Vector3d weightGradient = part.kernel.weightGradient(2 - ki, 2 - kj, 2 - kk);
+				// compute vector from part to node in world frame (x_i - x_p)
+				Vector3d vecPI = kernel.vecPI(ki, kj, kk);
 
-						// accumulate mass (eq. 172)
-						node.mass += weight * part.mass0;
+				// accumulate momentum (eq. 173)
+				// stores in node velocity, next mpm step computes velocity from momentum
+				node.vel += weight * part->mass0 * (part->vel + part->B * commonDInvScalar * vecPI);
 
-						// compute vector from part to node in world frame (x_i - x_p)
-						Vector3d vecPI = kernel.vecPI(2 - ki, 2 - kj, 2 - kk);
-
-						// accumulate momentum (eq. 173)
-						// stores in node velocity, next mpm step computes velocity from momentum
-						node.vel += weight * part.mass0 * (part.vel + part.B * commonDInvScalar * vecPI);
-
-						// internal stress force f_i (eq 189)
-						node.force -= part.VPFT * weightGradient;
-					}
-				}
+				// internal stress force f_i (eq 189)
+				node.force -= part->VPFT * weightGradient;
 			}
 		}
 	}
@@ -197,40 +178,34 @@ void OmpSolver::transferG2P(System& system, const SimParameters& parameters)
 		// reference to kernel
 		const Interpolation& kernel = part.kernel;
 
-		// loop through kernel nodes
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				for (int k = 0; k < 3; k++) {
+		// owning node
+		Node& node = *system.getNode(part.pos);
 
-					// compute grid frame coordinates of this iter's node
-					int gridX = kernel.node0.x() + i;
-					int gridY = kernel.node0.y() + j;
-					int gridZ = kernel.node0.z() + k;
-
-					// skip if out of bounds
-					if (!system.isInBounds(gridX, gridY, gridZ)) {
-						continue;
-					}
-
-					double   weight			= kernel.weight(i, j, k);
-					Vector3d weightGradient = kernel.weightGradient(i, j, k);
-
-					// reference to node
-					Node& node = *system.getNode(gridX, gridY, gridZ);
-
-					// accumulate velocity v_i (eq 175)
-					part.vel += weight * node.vel;
-
-					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = kernel.vecPI(i, j, k);
-
-					// acculumate affine state B_i (eq 176)
-					part.B += weight * node.vel * vecPI.transpose();
-
-					// accumulate node's deformation update (eq 181)
-					part.velGradient += node.vel * weightGradient.transpose();
-				}
+		// flag all neighbor nodes as active
+		for (Node* kernelNode : node.neighbors) {
+			if (kernelNode == nullptr) {
+				continue;
 			}
+
+			// kernel node's position relative to particle's kernel
+			int i = kernelNode->x - kernel.node0.x();
+			int j = kernelNode->y - kernel.node0.y();
+			int k = kernelNode->z - kernel.node0.z();
+
+			double   weight			= kernel.weight(i, j, k);
+			Vector3d weightGradient = kernel.weightGradient(i, j, k);
+
+			// accumulate velocity v_i (eq 175)
+			part.vel += weight * kernelNode->vel;
+
+			// compute vector from part to node in world frame (x_i - x_p)
+			Vector3d vecPI = kernel.vecPI(i, j, k);
+
+			// acculumate affine state B_i (eq 176)
+			part.B += weight * kernelNode->vel * vecPI.transpose();
+
+			// accumulate node's deformation update (eq 181)
+			part.velGradient += kernelNode->vel * weightGradient.transpose();
 		}
 	}
 }
@@ -245,7 +220,7 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
 
 		// old nearest node
-		Eigen::Vector3i currentNodeIndex = (part.pos.array() + 0.5).cast<int>();
+		Node* currentNode = system.getNode(part.pos);
 
 		// Advection
 		part.pos += parameters.timestep * part.vel;
@@ -255,21 +230,18 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 
 		// update node ownership if needed
 		// current nearest node
-		Eigen::Vector3i newNodeIndex = (part.pos.array() + 0.5).cast<int>();
+		Node* newNode = system.getNode(part.pos);
 
 		// update if different
-		if (newNodeIndex != currentNodeIndex) {
-			Node& currentNode = *system.getNode(currentNodeIndex);
-			omp_set_lock(&currentNode.lock);
-			currentNode.ownedParticles.erase(pi);
-			omp_unset_lock(&currentNode.lock);
+		if (newNode != currentNode) {
+			omp_set_lock(&currentNode->lock);
+			currentNode->ownedParticles.erase(&system.particles_[pi]);
+			omp_unset_lock(&currentNode->lock);
 
 			// insert into new node
-			system.getNode(newNodeIndex);
-			Node& newNode = *system.getNode(newNodeIndex);
-			omp_set_lock(&newNode.lock);
-			newNode.ownedParticles.insert(pi);
-			omp_unset_lock(&newNode.lock);
+			omp_set_lock(&newNode->lock);
+			newNode->ownedParticles.insert(&system.particles_[pi]);
+			omp_unset_lock(&newNode->lock);
 		}
 	}
 }
