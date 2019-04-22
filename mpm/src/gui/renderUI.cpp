@@ -16,7 +16,15 @@ void RenderUI::draw()
 
 	ImGui::SliderFloat("Point Size", &renderSettings_.pointSize, 0.1f, 20.0f);
 	ImGui::SliderFloat("Line Width", &renderSettings_.lineWidth, 0.1f, 10.0f);
-	ImGui::InputFloat("Vector Scaling", &renderSettings_.vectorScale, 0.f, 0.f, 5);
+	if (ImGui::InputFloat("Vector Scaling", &renderSettings_.vectorScale, 0.f, 0.f, 5)) {
+		renderSettings_.visibilityChanged = true;
+	}
+	ImGui::NewLine();
+
+	if (ImGui::Combo("Color", (int*)&renderSettings_.colorSetting, "Particle\0Elastic\0Plastic\0Partition\0Index\0\0")) {
+		renderSettings_.colorChanged = true;
+	}
+	ImGui::NewLine();
 
 	ImGui::Text("Show:");
 	if (ImGui::Checkbox("Particles", &renderSettings_.showParticles)) {

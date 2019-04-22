@@ -121,6 +121,4 @@ void StatsUI::draw()
 
 	End();
 
-	bool demo = true;
-	ImGui::ShowDemoWindow(&demo);
 }

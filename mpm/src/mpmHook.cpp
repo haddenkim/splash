@@ -37,13 +37,13 @@ void MpmHook::drawGUI()
 
 void MpmHook::initSimulation()
 {
-	renderDataNeedsUpdates_ = true;
+	renderDataNeedsUpdates_		 = true;
+	renderSettings_.colorChanged = true;
 
 	system_.reset(simParameters_.gridSize);
 	stats_.reset();
 
-	for(Solver* solver: solvers_)
-	{
+	for (Solver* solver : solvers_) {
 		solver->reset();
 	}
 
@@ -120,6 +120,11 @@ bool MpmHook::simulateOneStep()
 
 	renderDataNeedsUpdates_ = true;
 
+	// time dependent color
+	if (renderSettings_.colorSetting != RenderSettings::CLR_PARTICLE) {
+		renderSettings_.colorChanged = true;
+	}
+
 	if (simParameters_.numSteps == stats_.stepCount) {
 		pause();
 	}
@@ -139,17 +144,11 @@ void MpmHook::updateRenderGeometry()
 			particleVelocities_.resize(psize, 3);
 
 			for (int i = 0; i < psize; i++) {
-				particlePositions_.block<1, 3>(i, 0) = system_.particles_[i].pos / system_.gridSize_;
-				particleColors_.block<1, 3>(i, 0)	= system_.particles_[i].color;
+				const Particle& part = system_.particles_[i];
 
-				particleVelocities_.block<1, 3>(i, 0) = system_.particles_[i].vel;
+				particlePositions_.block<1, 3>(i, 0)  = part.pos / system_.gridSize_;
+				particleVelocities_.block<1, 3>(i, 0) = part.vel;
 			}
-
-			// particlePositions_.resize(system_.partCount, 3);
-			// particleColors_.resize(system_.partCount, 3);
-
-			// particlePositions_ = system_.partPos;
-			// particleColors_	= system_.partColor;
 		}
 
 		// grid
@@ -166,6 +165,27 @@ void MpmHook::updateRenderGeometry()
 			renderNeedsUpdate_		= true;
 		}
 	}
+
+	if (renderSettings_.colorChanged) {
+		for (int i = 0; i < system_.particles_.size(); i++) {
+			const Particle& part = system_.particles_[i];
+
+			// color
+			switch (renderSettings_.colorSetting) {
+			case RenderSettings::CLR_ELASTIC:
+				particleColors_.block<1, 3>(i, 0) = mapColor(part.F_E.determinant(), 1, 0.01);
+				break;
+
+			case RenderSettings::CLR_PLASTIC:
+				particleColors_.block<1, 3>(i, 0) = mapColor(part.J_P, 1, 0.01);
+				break;
+
+			default: // CLR_PARTICLE
+				particleColors_.block<1, 3>(i, 0) = part.color;
+				break;
+			}
+		}
+	}
 }
 
 void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
@@ -173,7 +193,7 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 	viewer.data().point_size = renderSettings_.pointSize;
 	viewer.data().line_width = renderSettings_.lineWidth;
 
-	if (renderNeedsUpdate_ || renderSettings_.visibilityChanged) {
+	if (renderNeedsUpdate_ || renderSettings_.visibilityChanged || renderSettings_.colorChanged) {
 
 		viewer.data().clear();
 
@@ -219,6 +239,7 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 
 		renderNeedsUpdate_				  = false;
 		renderSettings_.visibilityChanged = false;
+		renderSettings_.colorChanged	  = false;
 	}
 }
 
@@ -276,4 +297,45 @@ void MpmHook::writePNG(igl::opengl::glfw::Viewer& viewer)
 
 	// for file name
 	pngCount++;
+}
+
+Eigen::RowVector3d MpmHook::mapColor(double value, double base, double max)
+{
+	// normalize
+	double delta = (value - base) / max;
+
+	// positive -> red
+	if (delta > 0) {
+		return Eigen::RowVector3d(delta, 0, 0); // red
+
+	} else {
+		// negative -> blue
+		return Eigen::RowVector3d(0, 0, -delta); // blue
+	}
+
+	// // normalize, invert and bucket
+	// double bucket   = std::floor(delta * 4);
+	// double fraction = bucket - value;
+
+	// switch ((int)bucket) {
+	// case 0:
+	// 	return Eigen::RowVector3d(1, fraction, 0); // red to yellow
+	// 	break;
+
+	// case 1:
+	// 	return Eigen::RowVector3d(1 - fraction, 1, 0); // yellow to green
+	// 	break;
+
+	// case 2:
+	// 	return Eigen::RowVector3d(0, 1, fraction); // green to teal
+	// 	break;
+
+	// case 3:
+	// 	return Eigen::RowVector3d(0, 1 - fraction, 1); // teal to blue
+	// 	break;
+
+	// default: // 4
+	// 	return Eigen::RowVector3d(0, 0, 1);
+	// 	break;
+	// }
 }
