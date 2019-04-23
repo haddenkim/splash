@@ -1,4 +1,6 @@
 #include "mpmHook.h"
+#include "solver/ompBlockSolver.h"
+#include "solver/ompPartitionSolver.h"
 #include "solver/ompSolver.h"
 #include "solver/serialImplicitCRSolver.h"
 
@@ -14,6 +16,8 @@ MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
 	initialShapes_ = initialShapes;
 
 	// available solvers
+	solvers_.emplace_back(new OmpBlockSolver());
+	solvers_.emplace_back(new OmpPartitionSolver());
 	solvers_.emplace_back(new OmpSolver());
 	solvers_.emplace_back(new Solver());
 	solvers_.emplace_back(new SerialImplicitCRSolver());
@@ -49,10 +53,7 @@ void MpmHook::initSimulation()
 
 	// rebuild system
 	for (const Shape& shape : initialShapes_) {
-		system_.addCube(simParameters_.particlesPerObject,
-						shape.center,
-						shape.velocity,
-						shape.color);
+		shape.addTo(system_, simParameters_.particlesPerObject);
 	}
 	system_.sortParticles();
 
@@ -97,13 +98,13 @@ void MpmHook::initSimulation()
 
 	// grid nodes
 	{
-		int nodeCount = system_.nodes_.size();
+		int nodeCount = system_.nodeCount();
 		gridPositions_.resize(nodeCount, 3);
 		gridVelocities_.resize(nodeCount, 3);
 		gridForces_.resize(nodeCount, 3);
 
 		for (int ni = 0; ni < nodeCount; ni++) {
-			const Node& node = system_.nodes_[ni];
+			const Node& node = system_.getNode(ni);
 
 			gridPositions_.block<1, 3>(ni, 0) = RowVector3d(node.x, node.y, node.z) / system_.gridSize_;
 		}
@@ -138,23 +139,23 @@ void MpmHook::updateRenderGeometry()
 
 		// particles
 		{
-			int psize = system_.particles_.size();
+			int psize = system_.partCount();
 			particlePositions_.resize(psize, 3);
 			particleColors_.resize(psize, 3);
 			particleVelocities_.resize(psize, 3);
 
-			for (int i = 0; i < psize; i++) {
-				const Particle& part = system_.particles_[i];
+			for (int pi = 0; pi < psize; pi++) {
+				const Particle& part = system_.getPart(pi);
 
-				particlePositions_.block<1, 3>(i, 0)  = part.pos / system_.gridSize_;
-				particleVelocities_.block<1, 3>(i, 0) = part.vel;
+				particlePositions_.block<1, 3>(pi, 0)  = part.pos / system_.gridSize_;
+				particleVelocities_.block<1, 3>(pi, 0) = part.vel;
 			}
 		}
 
 		// grid
 		{
-			for (int ni = 0; ni < system_.nodes_.size(); ni++) {
-				const Node& node = system_.nodes_[ni];
+			for (int ni = 0; ni < system_.nodeCount(); ni++) {
+				const Node& node = system_.getNode(ni);
 
 				gridVelocities_.block<1, 3>(ni, 0) = node.vel / system_.gridSize_;
 				gridForces_.block<1, 3>(ni, 0)	 = node.force / system_.gridSize_;
@@ -167,21 +168,21 @@ void MpmHook::updateRenderGeometry()
 	}
 
 	if (renderSettings_.colorChanged) {
-		for (int i = 0; i < system_.particles_.size(); i++) {
-			const Particle& part = system_.particles_[i];
+		for (int pi = 0; pi < system_.partCount(); pi++) {
+			const Particle& part = system_.getPart(pi);
 
 			// color
 			switch (renderSettings_.colorSetting) {
 			case RenderSettings::CLR_ELASTIC:
-				particleColors_.block<1, 3>(i, 0) = mapColor(part.F_E.determinant(), 1, 0.01);
+				particleColors_.block<1, 3>(pi, 0) = mapColor(part.F_E.determinant(), 1, 0.01);
 				break;
 
 			case RenderSettings::CLR_PLASTIC:
-				particleColors_.block<1, 3>(i, 0) = mapColor(part.J_P, 1, 0.01);
+				particleColors_.block<1, 3>(pi, 0) = mapColor(part.J_P, 1, 0.01);
 				break;
 
 			default: // CLR_PARTICLE
-				particleColors_.block<1, 3>(i, 0) = part.color;
+				particleColors_.block<1, 3>(pi, 0) = part.color;
 				break;
 			}
 		}

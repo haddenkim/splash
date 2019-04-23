@@ -19,42 +19,36 @@ void System::reset(int size)
 {
 	particles_.clear();
 
-	gridSize_  = size;
-	nodeCountX = gridSize_ + 1;
-	// dx_		  = 1.0 / (gridSize_ - 1);
-	nodeCountXY_ = nodeCountX * nodeCountX;
-
-	boundaryStart_ = 3;
-	boundaryEnd_   = gridSize_ - 3;
-
 	setupGrid(size);
 }
 
-void System::addCube(int partCount, Vector3d center, Vector3d velocity, RowVector3d color)
+void System::addPart(Eigen::Vector3d pos, Eigen::Vector3d velocity, Eigen::RowVector3d color)
 {
+
 	// retrieve model
 	ConstitutiveModel* model = constitutiveModels[0];
 
-	double diameter = (double)gridSize_ / 10;
+	particles_.emplace_back(Particle(pos, velocity, model, color));
+}
 
-	for (int i = 0; i < partCount; i++) {
-		// get new particle's index
-		int pi = particles_.size();
+int System::partCount() const
+{
+	return particles_.size();
+}
 
-		// random position from [-1,1]
-		Vector3d position = Vector3d::Random().array();
+Particle& System::getPart(int pi)
+{
+	return particles_[pi];
+}
 
-		position = position * diameter + center * gridSize_;
+const Particle& System::getPart(int pi) const
+{
+	return particles_[pi];
+}
 
-		particles_.emplace_back(Particle(position, velocity, model, color));
-
-		// position of nearest node
-		Eigen::Vector3i nodePos = (position.array() + 0.5).cast<int>();
-
-		// add to node's list
-		// Node* node = getNode(nodePos);
-		// node->ownedParticles.insert(pi);
-	}
+int System::nodeCount() const
+{
+	return nodes_.size();
 }
 
 unsigned System::getNodeIndex(u_int32_t x, u_int32_t y, u_int32_t z) const
@@ -81,26 +75,67 @@ unsigned System::getNodeIndex(u_int32_t x, u_int32_t y, u_int32_t z) const
 	// return x * nodeCountXY_ + y * nodeCountX + z;
 }
 
-Node* System::getNode(int x, int y, int z)
+Node& System::getNode(int ni)
+{
+	return nodes_[ni];
+}
+
+const Node& System::getNode(int ni) const
+{
+	return nodes_[ni];
+}
+
+Node& System::getNode(int x, int y, int z)
 {
 	int ni = getNodeIndex(x, y, z);
 
 	assert(ni >= 0 && ni < nodes_.size());
 
-	return &nodes_[getNodeIndex(x, y, z)];
+	return getNode(ni);
 }
 
-Node* System::getNode(Eigen::Vector3i pos)
+Node& System::getNode(Eigen::Vector3i pos)
 {
 	return getNode(pos.x(), pos.y(), pos.z());
 }
 
-Node* System::getNode(Eigen::Vector3d pos)
+Node& System::getNode(Eigen::Vector3d pos)
 {
 	// position of nearest node
 	Eigen::Vector3i nodePos = (pos.array() + 0.5).cast<int>();
 
 	return getNode(nodePos);
+}
+
+int System::blockCount() const
+{
+	return blocks_.size();
+}
+
+unsigned System::getBlockIndex(unsigned x, unsigned y, unsigned z) const
+{
+	return x * blockCount_.x() * blockCount_.y() + y * blockCount_.y() + z;
+}
+
+NodeBlock& System::getBlock(int x, int y, int z)
+{
+	int bi = getBlockIndex(x, y, z);
+	assert(bi >= 0 && bi < blocks_.size());
+
+	return blocks_[bi];
+}
+
+NodeBlock& System::getBlock(Eigen::Vector3i pos)
+{
+	return getBlock(pos.x(), pos.y(), pos.z());
+}
+
+NodeBlock& System::getBlock(Eigen::Vector3d pos)
+{
+	// position of nearest node
+	Eigen::Vector3i nodePos = (pos.array() + 0.5).cast<int>();
+
+	return getBlock(nodePos);
 }
 
 bool System::isInBounds(double x, double y, double z) const
@@ -134,20 +169,78 @@ void System::sortParticles()
 		Eigen::Vector3i nodePos = (part.pos.array() + 0.5).cast<int>();
 
 		// add to node's list
-		Node* node = getNode(nodePos);
-		node->ownedParticles.insert(&particles_[pi]);
+		Node& node = getNode(nodePos);
+		node.ownedParticles.insert(&particles_[pi]);
 	}
 }
 
 void System::setupGrid(int size)
 {
-	nodes_ = std::vector<Node>(nodeCountX * nodeCountX * nodeCountX);
+	// calculate block count in each direction
+	blockCount_ = Vector3i(gridSize_ / BLOCK_SIZE_X, gridSize_ / BLOCK_SIZE_Y, gridSize_ / BLOCK_SIZE_Z);
+
+	// initialize blocks
+	blocks_ = std::vector<NodeBlock>(blockCount_.prod());
+
+	// iterate over the block root position
+	for (int i = 0; i < gridSize_; i += BLOCK_SIZE_X) {
+		for (int j = 0; j < gridSize_; j += BLOCK_SIZE_Y) {
+			for (int k = 0; k < gridSize_; k += BLOCK_SIZE_Z) {
+				NodeBlock& block = getBlock(i, j, k);
+
+				// set node data inside block
+				for (int ni = 0; ni < BLOCK_SIZE_X; ni++) {
+					for (int nj = 0; nj < BLOCK_SIZE_Y; nj++) {
+						for (int nk = 0; nk < BLOCK_SIZE_Z; nk++) {
+							// index of node in block list
+							int   index = ni * BLOCK_SIZE_X * BLOCK_SIZE_Y + nj * BLOCK_SIZE_Y + nk;
+							Node& node  = block.nodes[index];
+
+							node.x = i + ni;
+							node.y = j + nj;
+							node.z = j + nk;
+						}
+					}
+				}
+
+				// 			// neighbors
+				// 			for (int ki = 0; ki < 3; ki++) {
+				// 				for (int kj = 0; kj < 3; kj++) {
+				// 					for (int kk = 0; kk < 3; kk++) {
+				// 						// compute this block's index in the parent neighbor list
+				// 						int index = ki * 9 + kj * 3 + kk;
+
+				// 						// compute neighbor grid position
+				// 						int kx = i + (ki - 1) * BLOCK_SIZE_X;
+				// 						int ky = j + (kj - 1) * BLOCK_SIZE_Y;
+				// 						int kz = k + (kk - 1) * BLOCK_SIZE_Z;
+
+				// 						// add to neighbor list (or nullptr if out of bounds)
+				// 						block->neighbors[index] = isInBounds(kx, ky, kz) ? getBlock(kx, ky, kz) : nullptr;
+				// 					}
+				// 				}
+				// 			}
+			}
+		}
+	}
+
+	gridSize_  = size;
+	nodeCountX = gridSize_ + 1;
+	// dx_		  = 1.0 / (gridSize_ - 1);
+	nodeCountXY_ = nodeCountX * nodeCountX;
+
+	boundaryStart_ = 3;
+	boundaryEnd_   = gridSize_ - 3;
+
+	// set every node's grid position
+
+	nodes_ = std::vector<Node>(gridSize_ * gridSize_ * gridSize_);
 
 	// set every node's grid position
 	int ni;
-	for (int i = 0; i < nodeCountX; i++) {
-		for (int j = 0; j < nodeCountX; j++) {
-			for (int k = 0; k < nodeCountX; k++) {
+	for (int i = 0; i < gridSize_; i++) {
+		for (int j = 0; j < gridSize_; j++) {
+			for (int k = 0; k < gridSize_; k++) {
 
 				int   ni   = getNodeIndex(i, j, k);
 				Node& node = nodes_[ni];
@@ -170,7 +263,7 @@ void System::setupGrid(int size)
 							int index = ki * 9 + kj * 3 + kk;
 
 							// add to neighbor list (or nullptr if out of bounds)
-							node.neighbors[index] = isInBounds(kx, ky, kz) ? getNode(kx, ky, kz) : nullptr;
+							node.neighbors[index] = isInBounds(kx, ky, kz) ? &getNode(kx, ky, kz) : nullptr;
 						}
 					}
 				}

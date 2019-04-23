@@ -43,8 +43,9 @@ void Solver::advance(System& system, const SimParameters parameters, Stats& stat
 
 void Solver::resetGrid(System& system)
 {
-	for (Node& node : system.nodes_) {
-		node.mass = 0;
+	for (int ni = 0; ni < activeNodes_.size(); ni++) {
+		Node& node = *activeNodes_[ni];
+		node.mass  = 0;
 		node.vel.setZero();
 		node.force.setZero();
 	}
@@ -55,8 +56,8 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
 	double commonDInvScalar = Interpolation::DInverseScalar(system.dx_);
 
-	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		Particle& part = system.particles_[pi];
+	for (int pi = 0; pi < system.partCount(); pi++) {
+		Particle& part = system.getPart(pi);
 
 		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
 		part.VPFT = part.model->computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
@@ -84,7 +85,7 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 					Vector3d weightGradient = kernel.weightGradient(i, j, k);
 
 					// reference to node
-					Node& node = *system.getNode(gridX, gridY, gridZ);
+					Node& node = system.getNode(gridX, gridY, gridZ);
 
 					// accumulate mass (eq. 172)
 					node.mass += weight * part.mass0;
@@ -107,10 +108,8 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 void Solver::computeGrid(System& system, const SimParameters& parameters)
 {
 	// loop through all nodes
-
-	for (int ni = 0; ni < system.nodes_.size(); ni++) {
-		// reference to node
-		Node& node = system.nodes_[ni];
+	for (int ni = 0; ni < system.nodeCount(); ni++) {
+		Node& node = system.getNode(ni);
 
 		// skip if node has no mass (aka no particles nearby)
 		if (node.mass == 0) {
@@ -134,7 +133,8 @@ void Solver::computeGrid(System& system, const SimParameters& parameters)
 void Solver::transferG2P(System& system, const SimParameters& parameters)
 {
 	// loop through part
-	for (Particle& part : system.particles_) {
+	for (int pi = 0; pi < system.partCount(); pi++) {
+		Particle& part = system.getPart(pi);
 
 		// reset velocity v_p and affine state B_p and velocity gradient ∇v_p
 		part.vel.setZero();
@@ -163,7 +163,7 @@ void Solver::transferG2P(System& system, const SimParameters& parameters)
 					Vector3d weightGradient = kernel.weightGradient(i, j, k);
 
 					// reference to node
-					Node& node = *system.getNode(gridX, gridY, gridZ);
+					Node& node = system.getNode(gridX, gridY, gridZ);
 
 					// accumulate velocity v_i (eq 175)
 					part.vel += weight * node.vel;
@@ -184,7 +184,9 @@ void Solver::transferG2P(System& system, const SimParameters& parameters)
 
 void Solver::computeParticle(System& system, const SimParameters& parameters)
 {
-	for (Particle& part : system.particles_) {
+	for (int pi = 0; pi < system.partCount(); pi++) {
+		Particle& part = system.getPart(pi);
+
 		// update particle deformation gradient components
 		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
 
@@ -288,13 +290,14 @@ void Solver::computeTotalEnergy(Stats& stats, const System& system)
 	stats.totalKineticEnergy   = 0;
 	stats.totalPotentialEnergy = 0;
 
-	for (const Particle& part : system.particles_) {
+	for (int pi = 0; pi < system.partCount(); pi++) {
+		const Particle& part = system.getPart(pi);
+
 		// kinetic energy
 		stats.totalKineticEnergy += 0.5 * part.mass0 * part.vel.squaredNorm();
 		stats.totalPotentialEnergy += part.model->computePotentialEnergy(part.F_E, part.R_E, part.F_P, part.vol0);
 	}
 }
-
 
 void Solver::additionalStats(Stats& stats, const System& system)
 {

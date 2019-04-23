@@ -110,14 +110,14 @@ void SerialImplicitCRSolver::computeGrid(System& system, const SimParameters& pa
 
 void SerialImplicitCRSolver::computeParticle(System& system, const SimParameters& parameters)
 {
-	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		Particle& part = system.particles_[pi];
+	for (int pi = 0; pi < system.partCount(); pi++) {
+		Particle& part = system.getPart(pi);
 
 		// update particle deformation gradient components
 		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
 
 		// old nearest node
-		Eigen::Vector3i currentNodeIndex = (part.pos.array() + 0.5).cast<int>();
+		Node& currentNode = system.getNode(part.pos);
 
 		// Advection
 		part.pos += parameters.timestep * part.vel;
@@ -127,23 +127,26 @@ void SerialImplicitCRSolver::computeParticle(System& system, const SimParameters
 
 		// update node ownership if needed
 		// current nearest node
-		Eigen::Vector3i newNodeIndex = (part.pos.array() + 0.5).cast<int>();
+		Node& newNode = system.getNode(part.pos);
 
 		// update if different
-		if (newNodeIndex != currentNodeIndex) {
-			Node& currentNode = *system.getNode(currentNodeIndex);
-			currentNode.ownedParticles.erase(&system.particles_[pi]);
+		if (&newNode != &currentNode) {
+			omp_set_lock(&currentNode.lock);
+			currentNode.ownedParticles.erase(&system.getPart(pi));
+			omp_unset_lock(&currentNode.lock);
 
 			// insert into new node
-			Node& newNode = *system.getNode(newNodeIndex);
-			newNode.ownedParticles.insert(&system.particles_[pi]);
+			omp_set_lock(&newNode.lock);
+			newNode.ownedParticles.insert(&system.getPart(pi));
+			omp_unset_lock(&newNode.lock);
 		}
 	}
 }
 
 void SerialImplicitCRSolver::computeActiveNodeList(System& system)
 {
-	for (Node& node : system.nodes_) {
+	for (int ni = 0; ni < system.nodeCount(); ni++) {
+		Node& node = system.getNode(ni);
 		// skip if node has no mass (aka no particles nearby)
 		if (node.mass == 0) {
 			continue;
@@ -180,8 +183,8 @@ void SerialImplicitCRSolver::computeParticleVAFTs(System& system)
 {
 	// pre computes V A F^T for every particle (eq 196)
 
-	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		Particle&			 part   = system.particles_[pi];
+	for (int pi = 0; pi < system.partCount(); pi++) {
+		Particle&			 part   = system.getPart(pi);
 		const Interpolation& kernel = part.kernel;
 
 		// for every node in kernel
@@ -209,7 +212,7 @@ void SerialImplicitCRSolver::computeParticleVAFTs(System& system)
 					Vector3d weightGradient = kernel.weightGradient(i, j, k);
 
 					// reference to node
-					Node& node = *system.getNode(gridX, gridY, gridZ);
+					Node& node = system.getNode(gridX, gridY, gridZ);
 
 					// accumulate ∇v_p for F̂_E (eq 193)
 					part.velGradient += node.differentialU * weightGradient.transpose();
@@ -251,12 +254,12 @@ Eigen::Vector3d SerialImplicitCRSolver::computeHessianAction(const Node& node, c
 				}
 
 				// reference to kernel node
-				const Node& kernelNode = system.nodes_[system.getNodeIndex(gridX, gridY, gridZ)];
-				// const Node& kernelNode = *system.getNode(gridX, gridY, gridZ);
+				int ni = system.getNodeIndex(gridX, gridY, gridZ);
+				const Node& kernelNode = system.getNode(ni);
 
 				// loop through particles in kernel node
 				for (Particle* part : kernelNode.ownedParticles) {
-					Vector3d		weightGradient = part->kernel.weightGradient(2 - ki, 2 - kj, 2 - kk);
+					Vector3d weightGradient = part->kernel.weightGradient(2 - ki, 2 - kj, 2 - kk);
 
 					// accumulate hessian action aka differential force δf (eq 196)
 					hessianAction -= part->VAFT * weightGradient;

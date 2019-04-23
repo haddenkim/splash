@@ -18,7 +18,6 @@ void OmpSolver::resetGrid(System& system)
 // reset node
 #pragma omp parallel for schedule(static)
 	for (int ni = 0; ni < activeNodes_.size(); ni++) {
-		// reference to node
 		Node& node = *activeNodes_[ni];
 
 		node.mass = 0;
@@ -48,8 +47,8 @@ void OmpSolver::p2gPreComputeParts(System& system)
 {
 // pre-compute particle values
 #pragma omp parallel for schedule(static)
-	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		Particle& part = system.particles_[pi];
+	for (int pi = 0; pi < system.partCount(); pi++) {
+		Particle& part = system.getPart(pi);
 		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
 		part.VPFT = part.model->computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
 
@@ -58,7 +57,7 @@ void OmpSolver::p2gPreComputeParts(System& system)
 		kernel.compute(part.pos, system.dx_);
 
 		// owning node
-		Node& node = *system.getNode(part.pos);
+		Node& node = system.getNode(part.pos);
 
 		// flag all neighbor nodes as active
 		for (Node* kernelNode : node.neighbors) {
@@ -79,11 +78,11 @@ void OmpSolver::p2gSetActiveNodes(System& system)
 		std::vector<Node*> localActiveNodes;
 
 #pragma omp for schedule(static) nowait
-		for (int ni = 0; ni < system.nodes_.size(); ni++) {
-			Node* node = &system.nodes_[ni];
+		for (int ni = 0; ni < system.nodeCount(); ni++) {
+			Node& node = system.getNode(ni);
 
-			if (node->approxParts != 0) {
-				localActiveNodes.push_back(node);
+			if (node.approxParts != 0) {
+				localActiveNodes.push_back(&node);
 			}
 		}
 
@@ -167,8 +166,8 @@ void OmpSolver::transferG2P(System& system, const SimParameters& parameters)
 {
 // loop through part
 #pragma omp parallel for schedule(static)
-	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		Particle& part = system.particles_[pi];
+	for (int pi = 0; pi < system.partCount(); pi++) {
+		Particle& part = system.getPart(pi);
 
 		// reset velocity v_p and affine state B_p and velocity gradient ∇v_p
 		part.vel.setZero();
@@ -179,7 +178,7 @@ void OmpSolver::transferG2P(System& system, const SimParameters& parameters)
 		const Interpolation& kernel = part.kernel;
 
 		// owning node
-		Node& node = *system.getNode(part.pos);
+		Node& node = system.getNode(part.pos);
 
 		// flag all neighbor nodes as active
 		for (Node* kernelNode : node.neighbors) {
@@ -213,14 +212,14 @@ void OmpSolver::transferG2P(System& system, const SimParameters& parameters)
 void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 {
 #pragma omp parallel for schedule(static)
-	for (int pi = 0; pi < system.particles_.size(); pi++) {
-		Particle& part = system.particles_[pi];
+	for (int pi = 0; pi < system.partCount(); pi++) {
+		Particle& part = system.getPart(pi);
 
 		// update particle deformation gradient components
 		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
 
 		// old nearest node
-		Node* currentNode = system.getNode(part.pos);
+		Node& currentNode = system.getNode(part.pos);
 
 		// Advection
 		part.pos += parameters.timestep * part.vel;
@@ -230,18 +229,18 @@ void OmpSolver::computeParticle(System& system, const SimParameters& parameters)
 
 		// update node ownership if needed
 		// current nearest node
-		Node* newNode = system.getNode(part.pos);
+		Node& newNode = system.getNode(part.pos);
 
 		// update if different
-		if (newNode != currentNode) {
-			omp_set_lock(&currentNode->lock);
-			currentNode->ownedParticles.erase(&system.particles_[pi]);
-			omp_unset_lock(&currentNode->lock);
+		if (&newNode != &currentNode) {
+			omp_set_lock(&currentNode.lock);
+			currentNode.ownedParticles.erase(&system.getPart(pi));
+			omp_unset_lock(&currentNode.lock);
 
 			// insert into new node
-			omp_set_lock(&newNode->lock);
-			newNode->ownedParticles.insert(&system.particles_[pi]);
-			omp_unset_lock(&newNode->lock);
+			omp_set_lock(&newNode.lock);
+			newNode.ownedParticles.insert(&system.getPart(pi));
+			omp_unset_lock(&newNode.lock);
 		}
 	}
 }
