@@ -3,20 +3,14 @@
 
 class OmpSolver : public Solver {
 public:
-	std::string name() override { return "OpenMP"; };
+	std::string name() override { return "OpenMP Gather"; };
 
-	void advance(System& system, const SimParameters parameters, Stats& stats) override;
+	void advance(System& system, const SimParameters parameters, Stats& stats, int numSteps = 1) override;
 
 protected:
-	void resetGrid(System& system) override;
-	void transferP2G(System& system, const SimParameters& parameters) override;
-	void computeGrid(System& system, const SimParameters& parameters) override;
-	void transferG2P(System& system, const SimParameters& parameters) override;
-	void computeParticle(System& system, const SimParameters& parameters) override;
-
-	// helpers
-	void p2gPreComputeParts(System& system);
-	void p2gSetActiveNodes(System& system);
-	void p2gComputeNodes(System& system);
-
+	// virtual void resetGrid(System& system) override ;
+	// virtual void transferP2G(System& system, const SimParameters& parameters) override;
+	// virtual void computeGrid(System& system, const SimParameters& parameters) override;
+	// virtual void transferG2P(System& system, const SimParameters& parameters) override;
+	// virtual void computeParticle(System& system, const SimParameters& parameters) override;
 };

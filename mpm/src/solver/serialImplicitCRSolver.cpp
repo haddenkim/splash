@@ -2,21 +2,6 @@
 
 using namespace Eigen;
 
-void SerialImplicitCRSolver::resetGrid(System& system)
-{
-	for (int ni = 0; ni < activeNodes_.size(); ni++) {
-		// reference to node
-		Node& node = *activeNodes_[ni];
-
-		node.mass = 0;
-		node.vel.setZero();
-		node.force.setZero();
-	}
-
-	// reset bookkeeping
-	activeNodes_.clear();
-}
-
 void SerialImplicitCRSolver::computeGrid(System& system, const SimParameters& parameters)
 {
 
@@ -108,41 +93,6 @@ void SerialImplicitCRSolver::computeGrid(System& system, const SimParameters& pa
 	// printf("\n");
 }
 
-void SerialImplicitCRSolver::computeParticle(System& system, const SimParameters& parameters)
-{
-	for (int pi = 0; pi < system.partCount(); pi++) {
-		Particle& part = system.getPart(pi);
-
-		// update particle deformation gradient components
-		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
-
-		// old nearest node
-		Node& currentNode = system.getNode(part.pos);
-
-		// Advection
-		part.pos += parameters.timestep * part.vel;
-
-		// process potential collision
-		computeParticleCollision(part, system, parameters);
-
-		// update node ownership if needed
-		// current nearest node
-		Node& newNode = system.getNode(part.pos);
-
-		// update if different
-		if (&newNode != &currentNode) {
-			omp_set_lock(&currentNode.lock);
-			currentNode.ownedParticles.erase(&system.getPart(pi));
-			omp_unset_lock(&currentNode.lock);
-
-			// insert into new node
-			omp_set_lock(&newNode.lock);
-			newNode.ownedParticles.insert(&system.getPart(pi));
-			omp_unset_lock(&newNode.lock);
-		}
-	}
-}
-
 void SerialImplicitCRSolver::computeActiveNodeList(System& system)
 {
 	for (int ni = 0; ni < system.nodeCount(); ni++) {
@@ -165,21 +115,22 @@ void SerialImplicitCRSolver::computeAx(Eigen::VectorXd& b, System& system, const
 		Node& node = *activeNodes_[ni];
 
 		// set δu on each node
-		node.differentialU = x.segment<3>(3 * ni) * parameters.timestep;
+		node.differentialU = x.segment<3>(3 * ni);
 	}
 
 	// pre compute particle VAFT
-	computeParticleVAFTs(system);
+	computeParticleVAFTs(system, x);
 
 	// compute b
+	double betadTdT = parameters.B * parameters.timestep * parameters.timestep;
 	for (int ni = 0; ni < activeNodes_.size(); ni++) {
 		Node& node = *activeNodes_[ni];
 
-		b.segment<3>(3 * ni) = x.segment<3>(3 * ni) - parameters.B * parameters.timestep / node.mass * computeHessianAction(node, system);
+		b.segment<3>(3 * ni) = x.segment<3>(3 * ni) - betadTdT / node.mass * computeHessianAction(node, system);
 	}
 }
 
-void SerialImplicitCRSolver::computeParticleVAFTs(System& system)
+void SerialImplicitCRSolver::computeParticleVAFTs(System& system, const Eigen::VectorXd& x)
 {
 	// pre computes V A F^T for every particle (eq 196)
 
@@ -189,7 +140,7 @@ void SerialImplicitCRSolver::computeParticleVAFTs(System& system)
 
 		// for every node in kernel
 		// accumulate D matrix (eq 197) aka δF (eq 53)
-		Matrix3d differentailF_E = Matrix3d::Zero();
+		Matrix3d differentialF_E = Matrix3d::Zero();
 
 		// reset velocity gradient
 		part.velGradient.setZero();
@@ -218,7 +169,7 @@ void SerialImplicitCRSolver::computeParticleVAFTs(System& system)
 					part.velGradient += node.differentialU * weightGradient.transpose();
 
 					// accumulate D matrix (eq 197)
-					differentailF_E += node.differentialU * weightGradient.transpose() * part.F_E;
+					differentialF_E += node.differentialU * weightGradient.transpose() * part.F_E;
 				}
 			}
 		}
@@ -227,7 +178,7 @@ void SerialImplicitCRSolver::computeParticleVAFTs(System& system)
 		Eigen::Matrix3d F_E_hat = (Matrix3d::Identity() + part.velGradient) * part.F_E;
 
 		// compute A_p (eq 197) aka δP (eq 56)
-		Matrix3d A = part.model->computeFirstPiolaKirchoffDifferential(differentailF_E, F_E_hat, part.J_P);
+		Matrix3d A = part.model->computeFirstPiolaKirchoffDifferential(differentialF_E, F_E_hat, part.J_P);
 
 		// compute V A F^T (eq 196)
 		part.VAFT = part.vol0 * A * part.F_E.transpose();
@@ -254,7 +205,7 @@ Eigen::Vector3d SerialImplicitCRSolver::computeHessianAction(const Node& node, c
 				}
 
 				// reference to kernel node
-				int ni = system.getNodeIndex(gridX, gridY, gridZ);
+				int			ni		   = system.getNodeIndex(gridX, gridY, gridZ);
 				const Node& kernelNode = system.getNode(ni);
 
 				// loop through particles in kernel node
@@ -269,6 +220,49 @@ Eigen::Vector3d SerialImplicitCRSolver::computeHessianAction(const Node& node, c
 	}
 
 	return hessianAction;
+}
+
+Eigen::Matrix3d SerialImplicitCRSolver::computeParticleVAFT(const Particle& part, const Eigen::VectorXd& x)
+{
+	const Interpolation& kernel = part.kernel;
+
+	// // loop through kernel nodes
+	// for (int i = 0; i < 3; i++) {
+	// 	for (int j = 0; j < 3; j++) {
+	// 		for (int k = 0; k < 3; k++) {
+
+	// 			// compute grid frame coordinates of this iter's node
+	// 			int gridX = kernel.node0.x() + i;
+	// 			int gridY = kernel.node0.y() + j;
+	// 			int gridZ = kernel.node0.z() + k;
+
+	// 			// skip if out of bounds
+	// 			if (!system.isInBounds(gridX, gridY, gridZ)) {
+	// 				continue;
+	// 			}
+
+	// 			Vector3d weightGradient = kernel.weightGradient(i, j, k);
+
+	// 			// reference to node
+	// 			Node& node = system.getNode(gridX, gridY, gridZ);
+
+	// 			// accumulate ∇v_p for F̂_E (eq 193)
+	// 			part.velGradient += node.differentialU * weightGradient.transpose();
+
+	// 			// accumulate D matrix (eq 197)
+	// 			differentialF_E += node.differentialU * weightGradient.transpose() * part.F_E;
+	// 		}
+	// 	}
+	// }
+
+	// // compute  F̂_E (eq 197)
+	// Eigen::Matrix3d F_E_hat = (Matrix3d::Identity() + part.velGradient) * part.F_E;
+
+	// // compute A_p (eq 197) aka δP (eq 56)
+	// Matrix3d A = part.model->computeFirstPiolaKirchoffDifferential(differentialF_E, F_E_hat, part.J_P);
+
+	// // compute V A F^T (eq 196)
+	// part.VAFT = part.vol0 * A * part.F_E.transpose();
 }
 
 void SerialImplicitCRSolver::additionalStats(Stats& stats, const System& system)

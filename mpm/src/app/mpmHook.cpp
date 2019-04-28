@@ -1,6 +1,5 @@
 #include "mpmHook.h"
-#include "solver/ompBlockSolver.h"
-#include "solver/ompPartitionSolver.h"
+#include "settings/constants.h"
 #include "solver/ompSolver.h"
 #include "solver/serialImplicitCRSolver.h"
 
@@ -9,15 +8,14 @@
 
 using namespace Eigen;
 
-MpmHook::MpmHook(std::initializer_list<Shape> initialShapes)
+MpmHook::MpmHook(SystemStart start)
 	: PhysicsHook()
 	, ui_(renderSettings_, simParameters_, stats_, system_)
+	, start_(start)
 {
-	initialShapes_ = initialShapes;
-
 	// available solvers
-	solvers_.emplace_back(new OmpBlockSolver());
-	solvers_.emplace_back(new OmpPartitionSolver());
+	// solvers_.emplace_back(new OmpBlockSolver());
+	// solvers_.emplace_back(new OmpPartitionSolver());
 	solvers_.emplace_back(new OmpSolver());
 	solvers_.emplace_back(new Solver());
 	solvers_.emplace_back(new SerialImplicitCRSolver());
@@ -44,23 +42,17 @@ void MpmHook::initSimulation()
 	renderDataNeedsUpdates_		 = true;
 	renderSettings_.colorChanged = true;
 
-	system_.reset(simParameters_.gridSize);
+	system_.restart(start_);
 	stats_.reset();
 
 	for (Solver* solver : solvers_) {
 		solver->reset();
 	}
 
-	// rebuild system
-	for (const Shape& shape : initialShapes_) {
-		shape.addTo(system_, simParameters_.particlesPerObject);
-	}
-	system_.sortParticles();
-
 	// bounds
 	{
-		double s = (double)system_.boundaryStart_ / system_.gridSize_; // start
-		double e = (double)system_.boundaryEnd_ / system_.gridSize_;   // end
+		double s = (double)system_.boundaryStart_ / WORLD_NUM_NODES_X; // start
+		double e = (double)system_.boundaryEnd_ / WORLD_NUM_NODES_X;   // end
 
 		// x = L(eft) or R(ight)
 		// y = D(own) or U(p)
@@ -106,7 +98,7 @@ void MpmHook::initSimulation()
 		for (int ni = 0; ni < nodeCount; ni++) {
 			const Node& node = system_.getNode(ni);
 
-			gridPositions_.block<1, 3>(ni, 0) = RowVector3d(node.x, node.y, node.z) / system_.gridSize_;
+			gridPositions_.block<1, 3>(ni, 0) = RowVector3d(node.x, node.y, node.z) / WORLD_NUM_NODES_X;
 		}
 	}
 }
@@ -117,9 +109,10 @@ void MpmHook::tick()
 
 bool MpmHook::simulateOneStep()
 {
-	solvers_[simParameters_.selectedSolver]->advance(system_, simParameters_, stats_);
-
 	renderDataNeedsUpdates_ = true;
+
+	// advance 'drawInterval' number of steps
+	solvers_[simParameters_.selectedSolver]->advance(system_, simParameters_, stats_, renderSettings_.drawInverval);
 
 	// time dependent color
 	if (renderSettings_.colorSetting != RenderSettings::CLR_PARTICLE) {
@@ -135,7 +128,7 @@ bool MpmHook::simulateOneStep()
 
 void MpmHook::updateRenderGeometry()
 {
-	if (stats_.stepCount % renderSettings_.drawInverval == 0 && renderDataNeedsUpdates_) {
+	if (renderDataNeedsUpdates_) {
 
 		// particles
 		{
@@ -147,8 +140,8 @@ void MpmHook::updateRenderGeometry()
 			for (int pi = 0; pi < psize; pi++) {
 				const Particle& part = system_.getPart(pi);
 
-				particlePositions_.block<1, 3>(pi, 0)  = part.pos / system_.gridSize_;
-				particleVelocities_.block<1, 3>(pi, 0) = part.vel;
+				particlePositions_.block<1, 3>(pi, 0)  = part.pos / WORLD_NUM_NODES_X;
+				particleVelocities_.block<1, 3>(pi, 0) = part.vel / WORLD_NUM_NODES_X;
 			}
 		}
 
@@ -157,14 +150,14 @@ void MpmHook::updateRenderGeometry()
 			for (int ni = 0; ni < system_.nodeCount(); ni++) {
 				const Node& node = system_.getNode(ni);
 
-				gridVelocities_.block<1, 3>(ni, 0) = node.vel / system_.gridSize_;
-				gridForces_.block<1, 3>(ni, 0)	 = node.force / system_.gridSize_;
+				gridVelocities_.block<1, 3>(ni, 0) = node.vel / WORLD_NUM_NODES_X;
+				gridForces_.block<1, 3>(ni, 0)	 = node.force / WORLD_NUM_NODES_X;
 			}
-
-			// update flag
-			renderDataNeedsUpdates_ = false;
-			renderNeedsUpdate_		= true;
 		}
+
+		// update flag
+		renderDataNeedsUpdates_ = false;
+		renderNeedsUpdate_		= true;
 	}
 
 	if (renderSettings_.colorChanged) {
@@ -234,7 +227,7 @@ void MpmHook::renderRenderGeometry(igl::opengl::glfw::Viewer& viewer)
 		}
 
 		// write png only when sim changes, not if visibility settings change
-		if (renderSettings_.writePNG && !isPaused() && renderNeedsUpdate_) {
+		if (renderSettings_.writePNG && renderNeedsUpdate_) {
 			writePNG(viewer);
 		}
 

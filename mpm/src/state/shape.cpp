@@ -1,35 +1,34 @@
 #include "shape.h"
-#include "state/system.h"
+#include "settings/constants.h"
+#include "state/particle.h"
 
 using namespace Eigen;
 
-Shape::Shape(double cx, double cy, double cz, double vx, double vy, double vz, double r, double g, double b)
-	: center(cx, cy, cz)
+Shape::Shape(ModelType type, double cx, double cy, double cz, double vx, double vy, double vz, double r, double g, double b)
+	: type(type)
+	, center(cx, cy, cz)
 	, velocity(vx, vy, vz)
-	, color(r, g, b){
-
-	};
-
-Shape::Shape(Eigen::Vector3d center,
-			 Eigen::Vector3d velocity,
-			 Eigen::Vector3d color)
-	: center(center)
-	, velocity(velocity)
-	, color(color){
-
-	};
-
-void Shape::addTo(System& system, int partCount) const
+	, color(r, g, b)
 {
+	// scale to world dimension
+	center.x() = cx * WORLD_NUM_NODES_X;
+	center.y() = cy * WORLD_NUM_NODES_Y;
+	center.z() = cz * WORLD_NUM_NODES_Z;
 
-	double diameter = (double)system.gridSize_ / 10;
+	velocity.x() = vx * WORLD_NUM_NODES_X;
+	velocity.y() = vy * WORLD_NUM_NODES_Y;
+	velocity.z() = vz * WORLD_NUM_NODES_Z;
+};
 
-	for (int i = 0; i < partCount; i++) {
-		// random position from [-1,1]
-		Vector3d position = Vector3d::Random().array();
+// TODO: Allow for alternative shapes
+// For now, shape is a cube
+Eigen::Vector3d Shape::getRandomParticlePos()
+{
+	double diameter = (double)WORLD_NUM_NODES_X / 10;
 
-		position = position * diameter + center * system.gridSize_;
+	// random position from [-1,1]
+	Vector3d position = Vector3d::Random().array();
 
-		system.addPart(position, velocity, color);
-	}
+	// scale and translate
+	return position * diameter + center;
 }

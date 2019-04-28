@@ -3,10 +3,10 @@
 
 struct Interpolation {
 	Interpolation();
-	Interpolation(Eigen::Vector3d position, double dx);
+	Interpolation(Eigen::Vector3d position);
 
 	// compute the underlying kernel data
-	void compute(Eigen::Vector3d position, double dx);
+	void compute(Eigen::Vector3d position);
 
 	// retrieve
 	double weight(int i, int j, int k) const;
@@ -15,7 +15,7 @@ struct Interpolation {
 
 	Eigen::Vector3d vecPI(int i, int j, int k) const;
 
-	static double DInverseScalar(double dx);
+	static double DInverseScalar();
 
 	// data
 	Eigen::Vector3i node0;  // node position of 1st node in grid frame

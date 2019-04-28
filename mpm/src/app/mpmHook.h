@@ -3,17 +3,16 @@
 #include "settings/renderSettings.h"
 #include "settings/simParameters.h"
 #include "settings/stats.h"
+#include "settings/systemStart.h"
 #include "state/particle.h"
-#include "state/shape.h"
 #include "state/system.h"
 #include <Eigen/Core>
-#include <initializer_list>
 
 class Solver;
 
 class MpmHook : public PhysicsHook {
 public:
-	MpmHook(std::initializer_list<Shape> initialShapes);
+	MpmHook(SystemStart start);
 
 	void drawGUI() override;
 
@@ -30,7 +29,7 @@ public:
 	void mouseClicked(double x, double y, int button) override;
 
 	//
-	void writePNG(igl::opengl::glfw::Viewer& viewer);
+	void			   writePNG(igl::opengl::glfw::Viewer& viewer);
 	Eigen::RowVector3d mapColor(double value, double base, double max);
 
 	// libigl render data
@@ -48,8 +47,8 @@ public:
 	Eigen::MatrixXd gridBorders_;
 
 	// simulation state
-	std::vector<Shape> initialShapes_;
-	System			   system_;
+	SystemStart start_;
+	System		system_;
 
 	// solvers
 	std::vector<Solver*> solvers_;

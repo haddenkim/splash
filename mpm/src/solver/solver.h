@@ -7,10 +7,10 @@
 
 class Solver {
 public:
-	virtual std::string name() { return "Default"; };
+	virtual std::string name() { return "Base"; };
 
 	virtual void reset();
-	virtual void advance(System& system, const SimParameters parameters, Stats& stats);
+	virtual void advance(System& system, const SimParameters parameters, Stats& stats, int numSteps = 1);
 
 protected:
 	virtual void resetGrid(System& system);
@@ -25,9 +25,10 @@ protected:
 	virtual void computeParticleCollision(Particle& part, const System& system, const SimParameters& parameters);
 
 	// analysis
-	void clock(unsigned int& current, unsigned int& total, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds>& start);
-	void computeTotalEnergy(Stats& stats, const System& system);
+	void		 clock(unsigned int& current, unsigned int& total, std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::nanoseconds>& start);
+	void		 computeTotalEnergy(Stats& stats, const System& system);
 	virtual void additionalStats(Stats& stats, const System& system);
 
+	// time integration book keeping
 	std::vector<Node*> activeNodes_;
 };

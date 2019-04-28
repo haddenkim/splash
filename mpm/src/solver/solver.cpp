@@ -9,62 +9,68 @@ void Solver::reset()
 	activeNodes_.clear();
 }
 
-void Solver::advance(System& system, const SimParameters parameters, Stats& stats)
+void Solver::advance(System& system, const SimParameters parameters, Stats& stats, int numSteps)
 {
-	// printf("solve step: %i\n", stats.stepCount);
+	for (int t = 0; t < numSteps; t++) {
+		auto start = std::chrono::high_resolution_clock::now();
 
-	auto start = std::chrono::high_resolution_clock::now();
+		resetGrid(system);
+		clock(stats.timeReset, stats.totTimeReset, start);
 
-	resetGrid(system);
-	clock(stats.timeReset, stats.totTimeReset, start);
+		transferP2G(system, parameters);
+		clock(stats.timeP2G, stats.totTimeP2G, start);
 
-	transferP2G(system, parameters);
-	clock(stats.timeP2G, stats.totTimeP2G, start);
+		computeGrid(system, parameters);
+		clock(stats.timeGrid, stats.totTimeGrid, start);
 
-	computeGrid(system, parameters);
-	clock(stats.timeGrid, stats.totTimeGrid, start);
+		transferG2P(system, parameters);
+		clock(stats.timeG2P, stats.totTimeG2P, start);
 
-	transferG2P(system, parameters);
-	clock(stats.timeG2P, stats.totTimeG2P, start);
+		computeParticle(system, parameters);
+		clock(stats.timePart, stats.totTimePart, start);
 
-	computeParticle(system, parameters);
-	clock(stats.timePart, stats.totTimePart, start);
+		// log stats
+		stats.simTime += parameters.timestep;
+		stats.stepCount++;
 
-	// log stats
-	stats.simTime += parameters.timestep;
-	stats.stepCount++;
+		if (stats.trackEnergy) {
+			computeTotalEnergy(stats, system);
+		}
 
-	if (stats.trackEnergy) {
-		computeTotalEnergy(stats, system);
+		additionalStats(stats, system);
 	}
-
-	additionalStats(stats, system);
 }
 
 void Solver::resetGrid(System& system)
 {
-	for (int ni = 0; ni < activeNodes_.size(); ni++) {
-		Node& node = *activeNodes_[ni];
-		node.mass  = 0;
+	// loop through all nodes
+	for (int ni = 0; ni < system.nodeCount(); ni++) {
+		Node& node = system.getNode(ni);
+
+		node.mass = 0;
 		node.vel.setZero();
 		node.force.setZero();
 	}
+
+	// reset bookkeeping
+	activeNodes_.clear();
 }
 
 void Solver::transferP2G(System& system, const SimParameters& parameters)
 {
 	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-	double commonDInvScalar = Interpolation::DInverseScalar(system.dx_);
+	double commonDInvScalar = Interpolation::DInverseScalar();
 
 	for (int pi = 0; pi < system.partCount(); pi++) {
 		Particle& part = system.getPart(pi);
 
 		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
-		part.VPFT = part.model->computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
+		// part.VPFT = part.model->computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
+		Matrix3d partVPFT = part.model->computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
 
 		// compute the particle's kernel
 		Interpolation& kernel = part.kernel;
-		kernel.compute(part.pos, system.dx_);
+		kernel.compute(part.pos);
 
 		// loop through kernel nodes
 		for (int i = 0; i < 3; i++) {
@@ -98,7 +104,8 @@ void Solver::transferP2G(System& system, const SimParameters& parameters)
 					node.vel += weight * part.mass0 * (part.vel + part.B * commonDInvScalar * vecPI);
 
 					// internal stress force f_i (eq 189)
-					node.force -= part.VPFT * weightGradient;
+					// node.force -= part.VPFT * weightGradient;
+					node.force -= partVPFT * weightGradient;
 				}
 			}
 		}
@@ -190,11 +197,26 @@ void Solver::computeParticle(System& system, const SimParameters& parameters)
 		// update particle deformation gradient components
 		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
 
+		// old nearest node
+		Node& currentNode = system.getNode(part.pos);
+
 		// Advection
 		part.pos += parameters.timestep * part.vel;
 
 		// process potential collision
 		computeParticleCollision(part, system, parameters);
+
+		// update node ownership if needed
+		// current nearest node
+		Node& newNode = system.getNode(part.pos);
+
+		// update if different
+		if (&newNode != &currentNode) {
+			currentNode.ownedParticles.erase(&system.getPart(pi));
+
+			// insert into new node
+			newNode.ownedParticles.insert(&system.getPart(pi));
+		}
 	}
 }
 

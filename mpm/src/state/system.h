@@ -1,16 +1,18 @@
 #pragma once
-#include "models/constitutiveModel.h"
+#include "models/modelType.h"
+#include "settings/constants.h"
+#include "settings/systemStart.h"
 #include "state/node.h"
-#include "state/nodeBlock.h"
 #include "state/particle.h"
+#include "state/shape.h"
+#include <array>
 #include <vector>
+
+class ConstitutiveModel;
 
 class System {
 public:
-	System();
-
-	void reset(int size);
-	void addPart(Eigen::Vector3d pos, Eigen::Vector3d velocity, Eigen::RowVector3d color);
+	void restart(SystemStart start);
 
 	// particle getters
 	int				partCount() const;
@@ -27,21 +29,16 @@ public:
 	Node&		getNode(Eigen::Vector3d pos);
 
 	// block getters (in grid space)
-	int		   blockCount() const;
-	unsigned   getBlockIndex(unsigned x, unsigned y, unsigned z) const;
-	NodeBlock& getBlock(int x, int y, int z);
-	NodeBlock& getBlock(Eigen::Vector3i pos);
-	NodeBlock& getBlock(Eigen::Vector3d pos);
+	// int		   blockCount() const;
+	// unsigned   getBlockIndex(unsigned x, unsigned y, unsigned z) const;
+	// NodeBlock& getBlock(int x, int y, int z);
+	// NodeBlock& getBlock(Eigen::Vector3i pos);
+	// NodeBlock& getBlock(Eigen::Vector3d pos);
 
 	bool isInBounds(double x, double y, double z) const;
 	bool isInBounds(Eigen::Vector3d pos) const;
 
 	void sortParticles();
-
-	// grid dimensions
-	int	gridSize_;  //
-	int	nodeCountX; // number of nodes in each dimension
-	double dx_ = 1;	// ∆x distance between nodes. Simulation is performed entirely in "grid space", so dx is always 1
 
 	// TODO: create more sophisticated boundary conditions
 	// boundaries
@@ -53,15 +50,13 @@ public:
 
 private:
 	//helpers
-	void setupGrid(int size);
+	void setupGrid();
+	void addShapes(std::vector<Shape> shapes);
+	void addPart(ModelType type, Eigen::Vector3d pos, Eigen::Vector3d velocity, Eigen::RowVector3d color);
 
 	// sim data
-	std::vector<Particle>  particles_;
-	std::vector<Node>	  nodes_;
-	std::vector<NodeBlock> blocks_;
+	std::vector<Particle> particles_;
+	std::vector<Node>	 nodes_;
 
 	// TODO store rigid bodies
-
-	int				nodeCountXY_; // number of nodes in the X Y plane
-	Eigen::Vector3i blockCount_;  // number of blocks in X, Y, Z directions
 };

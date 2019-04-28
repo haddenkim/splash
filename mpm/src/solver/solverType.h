@@ -1,0 +1,11 @@
+#pragma once
+
+enum SolverType
+{
+	SOLVER_SERIAL,
+
+	SOLVER_OMP_GATHER,
+	
+	SOLVER_OMP_LOCK,
+	SOLVER_OMP_ATOMIC
+};

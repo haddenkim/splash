@@ -4,12 +4,12 @@ Interpolation::Interpolation()
 {
 }
 
-Interpolation::Interpolation(Eigen::Vector3d position, double dx)
+Interpolation::Interpolation(Eigen::Vector3d position)
 {
-	compute(position, dx);
+	compute(position);
 }
 
-void Interpolation::compute(Eigen::Vector3d position, double dx)
+void Interpolation::compute(Eigen::Vector3d position)
 {
 	// TODO: consider subclassing this for alternative interpolations (ex. linear, cubic)
 	// For now all functions here implement Quadradic B-spline interpolation (eq 123)
@@ -66,7 +66,7 @@ Eigen::Vector3d Interpolation::vecPI(int i, int j, int k) const
 	return Eigen::Vector3d(i, j, k) - vecI0P;
 }
 
-double Interpolation::DInverseScalar(double dx)
+double Interpolation::DInverseScalar()
 {
 	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
 	return 4.0 ; // (1/4 * (∆x)^2 * I)^-1

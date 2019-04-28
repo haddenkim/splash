@@ -6,29 +6,29 @@
 
 using namespace Eigen;
 
-System::System()
+void System::restart(SystemStart start)
 {
-	// snow 0
-	constitutiveModels.emplace_back(new SnowModel());
-
-	// sand 1
-	constitutiveModels.emplace_back(new SandModel());
-}
-
-void System::reset(int size)
-{
+	// clear old data
+	constitutiveModels.clear();
 	particles_.clear();
 
-	setupGrid(size);
-}
+	// setup grid
+	nodes_ = std::vector<Node>(WORLD_NUM_NODES);
+	setupGrid();
 
-void System::addPart(Eigen::Vector3d pos, Eigen::Vector3d velocity, Eigen::RowVector3d color)
-{
+	// setup models
+	constitutiveModels.emplace_back(new SnowModel()); // snow 0
+	constitutiveModels.emplace_back(new SandModel()); // sand 1
 
-	// retrieve model
-	ConstitutiveModel* model = constitutiveModels[0];
+	// setup particles
+	addShapes(start.shapes);
 
-	particles_.emplace_back(Particle(pos, velocity, model, color));
+	// setup boundary conditions
+	boundaryStart_ = 3;
+	boundaryEnd_   = WORLD_NUM_NODES_Z - 3;
+
+	// sort particles
+	sortParticles();
 }
 
 int System::partCount() const
@@ -107,40 +107,9 @@ Node& System::getNode(Eigen::Vector3d pos)
 	return getNode(nodePos);
 }
 
-int System::blockCount() const
-{
-	return blocks_.size();
-}
-
-unsigned System::getBlockIndex(unsigned x, unsigned y, unsigned z) const
-{
-	return x * blockCount_.x() * blockCount_.y() + y * blockCount_.y() + z;
-}
-
-NodeBlock& System::getBlock(int x, int y, int z)
-{
-	int bi = getBlockIndex(x, y, z);
-	assert(bi >= 0 && bi < blocks_.size());
-
-	return blocks_[bi];
-}
-
-NodeBlock& System::getBlock(Eigen::Vector3i pos)
-{
-	return getBlock(pos.x(), pos.y(), pos.z());
-}
-
-NodeBlock& System::getBlock(Eigen::Vector3d pos)
-{
-	// position of nearest node
-	Eigen::Vector3i nodePos = (pos.array() + 0.5).cast<int>();
-
-	return getBlock(nodePos);
-}
-
 bool System::isInBounds(double x, double y, double z) const
 {
-	return x >= 0 && y >= 0 && z >= 0 && x < gridSize_ && y < gridSize_ && z < gridSize_;
+	return x >= 0 && y >= 0 && z >= 0 && x < WORLD_NUM_NODES_X && y < WORLD_NUM_NODES_Y && z < WORLD_NUM_NODES_Z;
 }
 
 bool System::isInBounds(Eigen::Vector3d pos) const
@@ -150,6 +119,7 @@ bool System::isInBounds(Eigen::Vector3d pos) const
 
 void System::sortParticles()
 {
+	// sort particles based on their node's index
 	std::sort(particles_.begin(), particles_.end(), [&](const Particle& a, const Particle& b) -> bool {
 		Eigen::Vector3i aNode = (a.pos.array() + 0.5).cast<int>();
 		Eigen::Vector3i bNode = (b.pos.array() + 0.5).cast<int>();
@@ -174,92 +144,33 @@ void System::sortParticles()
 	}
 }
 
-void System::setupGrid(int size)
+void System::setupGrid()
 {
-	// calculate block count in each direction
-	blockCount_ = Vector3i(gridSize_ / BLOCK_SIZE_X, gridSize_ / BLOCK_SIZE_Y, gridSize_ / BLOCK_SIZE_Z);
-
-	// initialize blocks
-	blocks_ = std::vector<NodeBlock>(blockCount_.prod());
-
-	// iterate over the block root position
-	for (int i = 0; i < gridSize_; i += BLOCK_SIZE_X) {
-		for (int j = 0; j < gridSize_; j += BLOCK_SIZE_Y) {
-			for (int k = 0; k < gridSize_; k += BLOCK_SIZE_Z) {
-				NodeBlock& block = getBlock(i, j, k);
-
-				// set node data inside block
-				for (int ni = 0; ni < BLOCK_SIZE_X; ni++) {
-					for (int nj = 0; nj < BLOCK_SIZE_Y; nj++) {
-						for (int nk = 0; nk < BLOCK_SIZE_Z; nk++) {
-							// index of node in block list
-							int   index = ni * BLOCK_SIZE_X * BLOCK_SIZE_Y + nj * BLOCK_SIZE_Y + nk;
-							Node& node  = block.nodes[index];
-
-							node.x = i + ni;
-							node.y = j + nj;
-							node.z = j + nk;
-						}
-					}
-				}
-
-				// 			// neighbors
-				// 			for (int ki = 0; ki < 3; ki++) {
-				// 				for (int kj = 0; kj < 3; kj++) {
-				// 					for (int kk = 0; kk < 3; kk++) {
-				// 						// compute this block's index in the parent neighbor list
-				// 						int index = ki * 9 + kj * 3 + kk;
-
-				// 						// compute neighbor grid position
-				// 						int kx = i + (ki - 1) * BLOCK_SIZE_X;
-				// 						int ky = j + (kj - 1) * BLOCK_SIZE_Y;
-				// 						int kz = k + (kk - 1) * BLOCK_SIZE_Z;
-
-				// 						// add to neighbor list (or nullptr if out of bounds)
-				// 						block->neighbors[index] = isInBounds(kx, ky, kz) ? getBlock(kx, ky, kz) : nullptr;
-				// 					}
-				// 				}
-				// 			}
-			}
-		}
-	}
-
-	gridSize_  = size;
-	nodeCountX = gridSize_ + 1;
-	// dx_		  = 1.0 / (gridSize_ - 1);
-	nodeCountXY_ = nodeCountX * nodeCountX;
-
-	boundaryStart_ = 3;
-	boundaryEnd_   = gridSize_ - 3;
-
-	// set every node's grid position
-
-	nodes_ = std::vector<Node>(gridSize_ * gridSize_ * gridSize_);
 
 	// set every node's grid position
 	int ni;
-	for (int i = 0; i < gridSize_; i++) {
-		for (int j = 0; j < gridSize_; j++) {
-			for (int k = 0; k < gridSize_; k++) {
+	for (int x = 0; x < WORLD_NUM_NODES_X; x++) {
+		for (int y = 0; y < WORLD_NUM_NODES_Y; y++) {
+			for (int z = 0; z < WORLD_NUM_NODES_Z; z++) {
 
-				int   ni   = getNodeIndex(i, j, k);
+				int   ni   = getNodeIndex(x, y, z);
 				Node& node = nodes_[ni];
 
 				// position
-				node.x = i;
-				node.y = j;
-				node.z = k;
+				node.x = x;
+				node.y = y;
+				node.z = z;
 
 				// neighbors
-				for (int ki = 0; ki < 3; ki++) {
-					for (int kj = 0; kj < 3; kj++) {
-						for (int kk = 0; kk < 3; kk++) {
+				for (int ki = 0; ki < KERNEL_NUM_NODES_X; ki++) {
+					for (int kj = 0; kj < KERNEL_NUM_NODES_X; kj++) {
+						for (int kk = 0; kk < KERNEL_NUM_NODES_X; kk++) {
 							// compute neighbor position
-							int kx = i + ki - 1;
-							int ky = j + kj - 1;
-							int kz = k + kk - 1;
+							int kx = x + ki - 1;
+							int ky = y + kj - 1;
+							int kz = z + kk - 1;
 
-							// index in neighbor list
+							// index in node's neighbor list
 							int index = ki * 9 + kj * 3 + kk;
 
 							// add to neighbor list (or nullptr if out of bounds)
@@ -270,4 +181,24 @@ void System::setupGrid(int size)
 			}
 		}
 	}
+}
+
+void System::addShapes(std::vector<Shape> shapes)
+{
+	for (Shape& shape : shapes) {
+		for (int pi = 0; pi < PARTS_PER_OBJECT; pi++) {
+			Vector3d pos = shape.getRandomParticlePos();
+
+			addPart(shape.type, pos, shape.velocity, shape.color);
+		}
+	}
+}
+
+void System::addPart(ModelType type, Eigen::Vector3d pos, Eigen::Vector3d velocity, Eigen::RowVector3d color)
+{
+
+	// retrieve model
+	ConstitutiveModel* model = constitutiveModels[0];
+
+	particles_.emplace_back(Particle(pos, velocity, color, model));
 }

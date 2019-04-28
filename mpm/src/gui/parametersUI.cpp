@@ -21,8 +21,6 @@ void ParametersUI::draw()
 	ImGui::NewLine();
 	ImGui::Text("Requires Reset");
 	ImGui::SliderInt("Particle per Object", &simParameters_.particlesPerObject, 1, 100000);
-	// ImGui::DragInt("Particle per Object", &simParameters_.particlesPerObject, 1.0F, 1, 10000);
-	ImGui::SliderInt("Grid Size", &simParameters_.gridSize, 10, 64);
 
 	ImGui::NewLine();
 	ImGui::Text("Specific Solver Settings");

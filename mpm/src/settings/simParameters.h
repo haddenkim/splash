@@ -13,7 +13,6 @@ struct SimParameters {
 		numSteps = 1000;
 
 		particlesPerObject = 10000;
-		gridSize = 64;
 
 		gravityEnabled = true;
 		gravityG	   = 10;
@@ -35,7 +34,6 @@ struct SimParameters {
 	int   numSteps;
 
 	int particlesPerObject;
-	int gridSize;
 
 	bool  gravityEnabled;
 	float gravityG;
