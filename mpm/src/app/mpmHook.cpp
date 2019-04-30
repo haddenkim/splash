@@ -1,7 +1,13 @@
 #include "mpmHook.h"
 #include "settings/constants.h"
-#include "solver/ompSolver.h"
-#include "solver/serialImplicitCRSolver.h"
+#include "solver/solver.h"
+#include "state/system.h"
+#include "state/systemSetup.h"
+
+// #include "solver/ompSolver.h"
+// #include "solver/serialImplicitCRSolver.h"
+#include "solver/solverOmpScatter.h"
+#include "solver/solverOmpScatterReorder.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
@@ -14,11 +20,14 @@ MpmHook::MpmHook(SystemStart start)
 	, start_(start)
 {
 	// available solvers
-	// solvers_.emplace_back(new OmpBlockSolver());
+	solvers_.emplace_back(new SolverOmpScatter());
+	solvers_.emplace_back(new SolverOmpScatterReorder());
+
+
 	// solvers_.emplace_back(new OmpPartitionSolver());
-	solvers_.emplace_back(new OmpSolver());
-	solvers_.emplace_back(new Solver());
-	solvers_.emplace_back(new SerialImplicitCRSolver());
+	// solvers_.emplace_back(new OmpSolver());
+	// solvers_.emplace_back(new Solver());
+	// solvers_.emplace_back(new SerialImplicitCRSolver());
 
 	// set solver names for gui
 	simParameters_.solverNames = new char*[solvers_.size()];
@@ -42,64 +51,55 @@ void MpmHook::initSimulation()
 	renderDataNeedsUpdates_		 = true;
 	renderSettings_.colorChanged = true;
 
-	system_.restart(start_);
+	SystemSetup::initSystem(system_, start_, simParameters_.particlesPerObject);
 	stats_.reset();
 
-	for (Solver* solver : solvers_) {
-		solver->reset();
-	}
-
 	// bounds
-	{
-		double s = (double)system_.boundaryStart_ / WORLD_NUM_NODES_X; // start
-		double e = (double)system_.boundaryEnd_ / WORLD_NUM_NODES_X;   // end
+	double s = (double)system_.boundaryStart / WORLD_NUM_NODES_X; // start
+	double e = (double)system_.boundaryEnd / WORLD_NUM_NODES_X;   // end
 
-		// x = L(eft) or R(ight)
-		// y = D(own) or U(p)
-		// z = B(ack) or F(ront)
-		RowVector3d LDB(s, s, s);
-		RowVector3d RDB(e, s, s);
-		RowVector3d LUB(s, e, s);
-		RowVector3d RUB(e, e, s);
+	// x = L(eft) or R(ight)
+	// y = D(own) or U(p)
+	// z = B(ack) or F(ront)
+	RowVector3d LDB(s, s, s);
+	RowVector3d RDB(e, s, s);
+	RowVector3d LUB(s, e, s);
+	RowVector3d RUB(e, e, s);
 
-		RowVector3d LDF(s, s, e);
-		RowVector3d RDF(e, s, e);
-		RowVector3d LUF(s, e, e);
-		RowVector3d RUF(e, e, e);
+	RowVector3d LDF(s, s, e);
+	RowVector3d RDF(e, s, e);
+	RowVector3d LUF(s, e, e);
+	RowVector3d RUF(e, e, e);
 
-		gridBorders_.resize(12, 6); // 3 start , 3 end
+	gridBorders_.resize(12, 6); // 3 start , 3 end
 
-		// x edges
-		gridBorders_.row(0) << LDB, RDB;
-		gridBorders_.row(1) << LUB, RUB;
-		gridBorders_.row(2) << LDF, RDF;
-		gridBorders_.row(3) << LUF, RUF;
+	// x edges
+	gridBorders_.row(0) << LDB, RDB;
+	gridBorders_.row(1) << LUB, RUB;
+	gridBorders_.row(2) << LDF, RDF;
+	gridBorders_.row(3) << LUF, RUF;
 
-		// y edges
-		gridBorders_.row(4) << LDB, LUB;
-		gridBorders_.row(5) << RDB, RUB;
-		gridBorders_.row(6) << LDF, LUF;
-		gridBorders_.row(7) << RDF, RUF;
+	// y edges
+	gridBorders_.row(4) << LDB, LUB;
+	gridBorders_.row(5) << RDB, RUB;
+	gridBorders_.row(6) << LDF, LUF;
+	gridBorders_.row(7) << RDF, RUF;
 
-		// z edges
-		gridBorders_.row(8) << LDB, LDF;
-		gridBorders_.row(9) << RDB, RDF;
-		gridBorders_.row(10) << LUB, LUF;
-		gridBorders_.row(11) << RUB, RUF;
-	}
+	// z edges
+	gridBorders_.row(8) << LDB, LDF;
+	gridBorders_.row(9) << RDB, RDF;
+	gridBorders_.row(10) << LUB, LUF;
+	gridBorders_.row(11) << RUB, RUF;
 
 	// grid nodes
-	{
-		int nodeCount = system_.nodeCount();
-		gridPositions_.resize(nodeCount, 3);
-		gridVelocities_.resize(nodeCount, 3);
-		gridForces_.resize(nodeCount, 3);
+	gridPositions_.resize(WORLD_NUM_NODES, 3);
+	gridVelocities_.resize(WORLD_NUM_NODES, 3);
+	gridForces_.resize(WORLD_NUM_NODES, 3);
 
-		for (int ni = 0; ni < nodeCount; ni++) {
-			const Node& node = system_.getNode(ni);
+	for (int ni = 0; ni < WORLD_NUM_NODES; ni++) {
+		const Node& node = system_.nodes[ni];
 
-			gridPositions_.block<1, 3>(ni, 0) = RowVector3d(node.x, node.y, node.z) / WORLD_NUM_NODES_X;
-		}
+		gridPositions_.block<1, 3>(ni, 0) = RowVector3d(node.pos.x(), node.pos.y(), node.pos.z()) / WORLD_NUM_NODES_X;
 	}
 }
 
@@ -131,28 +131,25 @@ void MpmHook::updateRenderGeometry()
 	if (renderDataNeedsUpdates_) {
 
 		// particles
-		{
-			int psize = system_.partCount();
-			particlePositions_.resize(psize, 3);
-			particleColors_.resize(psize, 3);
-			particleVelocities_.resize(psize, 3);
+		int psize = system_.partCount;
+		particlePositions_.resize(psize, 3);
+		particleColors_.resize(psize, 3);
+		particleVelocities_.resize(psize, 3);
 
-			for (int pi = 0; pi < psize; pi++) {
-				const Particle& part = system_.getPart(pi);
+		for (int pi = 0; pi < psize; pi++) {
+			const auto& pos						  = system_.partPos[pi];
+			particlePositions_.block<1, 3>(pi, 0) = pos / WORLD_NUM_NODES_X;
 
-				particlePositions_.block<1, 3>(pi, 0)  = part.pos / WORLD_NUM_NODES_X;
-				particleVelocities_.block<1, 3>(pi, 0) = part.vel / WORLD_NUM_NODES_X;
-			}
+			const auto& vel						   = system_.partVel[pi];
+			particleVelocities_.block<1, 3>(pi, 0) = vel / WORLD_NUM_NODES_X;
 		}
 
 		// grid
-		{
-			for (int ni = 0; ni < system_.nodeCount(); ni++) {
-				const Node& node = system_.getNode(ni);
+		for (int ni = 0; ni < WORLD_NUM_NODES; ni++) {
+			const Node& node = system_.nodes[ni];
 
-				gridVelocities_.block<1, 3>(ni, 0) = node.vel / WORLD_NUM_NODES_X;
-				gridForces_.block<1, 3>(ni, 0)	 = node.force / WORLD_NUM_NODES_X;
-			}
+			gridVelocities_.block<1, 3>(ni, 0) = node.vel / WORLD_NUM_NODES_X;
+			gridForces_.block<1, 3>(ni, 0)	 = node.force / WORLD_NUM_NODES_X;
 		}
 
 		// update flag
@@ -161,21 +158,21 @@ void MpmHook::updateRenderGeometry()
 	}
 
 	if (renderSettings_.colorChanged) {
-		for (int pi = 0; pi < system_.partCount(); pi++) {
-			const Particle& part = system_.getPart(pi);
+		for (int pi = 0; pi < system_.partCount; pi++) {
 
-			// color
 			switch (renderSettings_.colorSetting) {
-			case RenderSettings::CLR_ELASTIC:
-				particleColors_.block<1, 3>(pi, 0) = mapColor(part.F_E.determinant(), 1, 0.01);
-				break;
+			case RenderSettings::CLR_ELASTIC: {
+				const auto& F_E					   = system_.partF_E[pi];
+				particleColors_.block<1, 3>(pi, 0) = mapColor(F_E.determinant(), 1, 0.01);
+			} break;
 
-			case RenderSettings::CLR_PLASTIC:
-				particleColors_.block<1, 3>(pi, 0) = mapColor(part.J_P, 1, 0.01);
-				break;
+			case RenderSettings::CLR_PLASTIC: {
+				const auto& J_P					   = system_.partJ_P[pi];
+				particleColors_.block<1, 3>(pi, 0) = mapColor(J_P, 1, 0.01);
+			} break;
 
 			default: // CLR_PARTICLE
-				particleColors_.block<1, 3>(pi, 0) = part.color;
+				particleColors_.block<1, 3>(pi, 0) = system_.partColor[pi];
 				break;
 			}
 		}

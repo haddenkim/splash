@@ -1,62 +1,56 @@
 #pragma once
-#include "models/modelType.h"
+
+#include "models/constitutiveModel.h"
 #include "settings/constants.h"
-#include "settings/systemStart.h"
 #include "state/node.h"
 #include "state/particle.h"
-#include "state/shape.h"
+
+#include <Eigen/Core>
 #include <array>
+#include <omp.h>
 #include <vector>
 
-class ConstitutiveModel;
+struct System {
 
-class System {
-public:
-	void restart(SystemStart start);
+	// node data
+	std::array<Node, WORLD_NUM_NODES>		   nodes;
+	std::array<NodeBlock, WORLD_NUM_BLOCKS>	blocks;
+	std::array<NodeSet, WORLD_NUM_SETS>		   sets;
+	std::array<NodeNeighbors, WORLD_NUM_NODES> neighbors;
 
-	// particle getters
-	int				partCount() const;
-	Particle&		getPart(int pi);
-	const Particle& getPart(int pi) const;
+	// particle data
+	int							 partCount; // number of particles in ssytem (for convenience)
+	bool						 partDataSorted;
+	std::vector<ParticleBase>	particles; // sort indices
+	std::vector<Eigen::Vector3d> partPos;   // position
 
-	// node getters
-	int			nodeCount() const;
-	unsigned	getNodeIndex(unsigned x, unsigned y, unsigned z) const;
-	Node&		getNode(int ni);
-	const Node& getNode(int ni) const;
-	Node&		getNode(int x, int y, int z);
-	Node&		getNode(Eigen::Vector3i pos);
-	Node&		getNode(Eigen::Vector3d pos);
+	// particle momentum
+	std::vector<double>			 partMass; //  mass
+	std::vector<Eigen::Vector3d> partVel;  // velocity
+	std::vector<Eigen::Matrix3d> partB;	// affine state
 
-	// block getters (in grid space)
-	// int		   blockCount() const;
-	// unsigned   getBlockIndex(unsigned x, unsigned y, unsigned z) const;
-	// NodeBlock& getBlock(int x, int y, int z);
-	// NodeBlock& getBlock(Eigen::Vector3i pos);
-	// NodeBlock& getBlock(Eigen::Vector3d pos);
+	// particle deformation
+	std::vector<ConstitutiveModel*> partModel;
+	std::vector<double>				partVol0; // initial volume
+	std::vector<Eigen::Matrix3d>	partF_E;  // elastic part of deformation gradient F
+	std::vector<Eigen::Matrix3d>	partF_P;  // plastic part of deformation gradient F
+	std::vector<Eigen::Matrix3d>	partR_E;  // rotational decomposition of F_E
+	std::vector<double>				partJ_P;  // determinant of the plastic deformation gradient
 
-	bool isInBounds(double x, double y, double z) const;
-	bool isInBounds(Eigen::Vector3d pos) const;
+	// particle rendering
+	std::vector<Eigen::Vector3d> partColor;
 
-	void sortParticles();
+	// temps
+	std::vector<Eigen::Matrix3d> partVelGrad;
 
 	// TODO: create more sophisticated boundary conditions
 	// boundaries
-	int boundaryStart_;
-	int boundaryEnd_;
+	int boundaryStart;
+	int boundaryEnd;
 
 	// particle model(s)
 	std::vector<ConstitutiveModel*> constitutiveModels;
 
-private:
-	//helpers
-	void setupGrid();
-	void addShapes(std::vector<Shape> shapes);
-	void addPart(ModelType type, Eigen::Vector3d pos, Eigen::Vector3d velocity, Eigen::RowVector3d color);
-
-	// sim data
-	std::vector<Particle> particles_;
-	std::vector<Node>	 nodes_;
-
-	// TODO store rigid bodies
+	// reorder buffer
+	std::vector<double> partReorderBuffer;
 };

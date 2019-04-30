@@ -22,7 +22,7 @@ Shape::Shape(ModelType type, double cx, double cy, double cz, double vx, double 
 
 // TODO: Allow for alternative shapes
 // For now, shape is a cube
-Eigen::Vector3d Shape::getRandomParticlePos()
+Eigen::Vector3d Shape::getRandomParticlePos() const
 {
 	double diameter = (double)WORLD_NUM_NODES_X / 10;
 

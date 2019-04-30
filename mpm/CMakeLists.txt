@@ -65,5 +65,6 @@ set(libs ${libs} OpenMP::OpenMP_CXX)
 # find_package(MPI REQUIRED)
 # set(libs ${libs}  ${MPI_C_LIBRARIES})
 
-
 target_link_libraries(${LIBRARY_NAME}   ${libs})
+
+# target_compile_options(${LIBRARY_NAME} PUBLIC -qopt-report=2 -qopt-report-phase=vec)

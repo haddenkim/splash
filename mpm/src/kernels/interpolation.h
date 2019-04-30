@@ -1,5 +1,10 @@
 #pragma once
-#include <Eigen/Dense>
+#include "settings/constants.h"
+#include "state/particle.h"
+#include <Eigen/Core>
+
+using PartWeights		  = double[KERNEL_NUM_NODES_X][KERNEL_NUM_NODES_X][KERNEL_NUM_NODES_X];			 // w_aip
+using PartWeightGradients = Eigen::Vector3d[KERNEL_NUM_NODES_X][KERNEL_NUM_NODES_X][KERNEL_NUM_NODES_X]; // ∇w_aip
 
 struct Interpolation {
 	Interpolation();
@@ -17,10 +22,12 @@ struct Interpolation {
 
 	static double DInverseScalar();
 
+	static void computeWeights(PartWeights& weights, PartWeightGradients& gradients, const Eigen::Vector3d pos);
+
 	// data
 	Eigen::Vector3i node0;  // node position of 1st node in grid frame
 	Eigen::Vector3d vecI0P; // vector from start node (I_0) to particle in grid frame
 
 	double			w[3][3][3];		  // w_aip
-	Eigen::Vector3d wGrad_H[3][3][3]; // ∇w_aip
+	Eigen::Vector3d wGrad[3][3][3]; // ∇w_aip
 };

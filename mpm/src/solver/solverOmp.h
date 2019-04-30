@@ -1,11 +1,11 @@
 #pragma once
 #include "solver/solver.h"
 
-class OmpSolver : public Solver {
+class SolverOmp : public Solver {
 public:
-	std::string name() override { return "OpenMP Gather"; };
+	std::string name() override { return "OpenMP Base"; };
 
-	void advance(System& system, const SimParameters parameters, Stats& stats, int numSteps = 1) override;
+	// void advance(System& system, const SimParameters parameters, Stats& stats, int numSteps = 1) override;
 
 protected:
 	// virtual void resetGrid(System& system) override ;

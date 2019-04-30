@@ -1,4 +1,5 @@
 #pragma once
+#include "settings/constants.h"
 #include <omp.h>
 #include <string>
 #include <vector>
@@ -12,7 +13,7 @@ struct SimParameters {
 		timestep = 1e-3;
 		numSteps = 1000;
 
-		particlesPerObject = 10000;
+		particlesPerObject = PARTS_PER_OBJECT;
 
 		gravityEnabled = true;
 		gravityG	   = 10;

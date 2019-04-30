@@ -62,7 +62,7 @@ void StatsUI::draw()
 		Text("%10i . %03i", stats_.totTimeGrid / 1000, stats_.totTimeGrid % 1000);
 		NextColumn();
 
-		Text("P2G");
+		Text("G2P");
 		NextColumn();
 		Text("%10i . %03i", stats_.timeG2P / 1000, stats_.timeG2P % 1000);
 		NextColumn();

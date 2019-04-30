@@ -1,13 +1,10 @@
-#include "solver.h"
-#include "kernels/interpolation.h"
+#include "solver/solver.h"
+#include "settings/simParameters.h"
+#include "settings/stats.h"
+#include "state/system.h"
 #include <Eigen/Dense>
-using namespace Eigen;
 
-void Solver::reset()
-{
-	// reset bookkeeping
-	activeNodes_.clear();
-}
+using namespace Eigen;
 
 void Solver::advance(System& system, const SimParameters parameters, Stats& stats, int numSteps)
 {
@@ -41,185 +38,6 @@ void Solver::advance(System& system, const SimParameters parameters, Stats& stat
 	}
 }
 
-void Solver::resetGrid(System& system)
-{
-	// loop through all nodes
-	for (int ni = 0; ni < system.nodeCount(); ni++) {
-		Node& node = system.getNode(ni);
-
-		node.mass = 0;
-		node.vel.setZero();
-		node.force.setZero();
-	}
-
-	// reset bookkeeping
-	activeNodes_.clear();
-}
-
-void Solver::transferP2G(System& system, const SimParameters& parameters)
-{
-	// compute common inertia-like tensor inverse (D_p)^-1 (paragraph after eq. 176)
-	double commonDInvScalar = Interpolation::DInverseScalar();
-
-	for (int pi = 0; pi < system.partCount(); pi++) {
-		Particle& part = system.getPart(pi);
-
-		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
-		// part.VPFT = part.model->computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
-		Matrix3d partVPFT = part.model->computeVolCauchyStress(part.vol0, part.F_E, part.R_E, part.J_P);
-
-		// compute the particle's kernel
-		Interpolation& kernel = part.kernel;
-		kernel.compute(part.pos);
-
-		// loop through kernel nodes
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				for (int k = 0; k < 3; k++) {
-
-					// compute grid frame coordinates of this iter's node
-					int gridX = kernel.node0.x() + i;
-					int gridY = kernel.node0.y() + j;
-					int gridZ = kernel.node0.z() + k;
-
-					// skip if out of bounds
-					if (!system.isInBounds(gridX, gridY, gridZ)) {
-						continue;
-					}
-
-					double   weight			= kernel.weight(i, j, k);
-					Vector3d weightGradient = kernel.weightGradient(i, j, k);
-
-					// reference to node
-					Node& node = system.getNode(gridX, gridY, gridZ);
-
-					// accumulate mass (eq. 172)
-					node.mass += weight * part.mass0;
-
-					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = kernel.vecPI(i, j, k);
-
-					// accumulate momentum (eq. 173)
-					// stores in node velocity, next mpm step computes velocity from momentum
-					node.vel += weight * part.mass0 * (part.vel + part.B * commonDInvScalar * vecPI);
-
-					// internal stress force f_i (eq 189)
-					// node.force -= part.VPFT * weightGradient;
-					node.force -= partVPFT * weightGradient;
-				}
-			}
-		}
-	}
-}
-
-void Solver::computeGrid(System& system, const SimParameters& parameters)
-{
-	// loop through all nodes
-	for (int ni = 0; ni < system.nodeCount(); ni++) {
-		Node& node = system.getNode(ni);
-
-		// skip if node has no mass (aka no particles nearby)
-		if (node.mass == 0) {
-			continue;
-		}
-
-		// compute velocity from momentum / mass
-		node.vel /= node.mass;
-
-		// apply external forces
-		computeGridExtForces(node, system, parameters);
-
-		// update grid velocities
-		node.vel = node.vel + parameters.timestep * node.force / node.mass;
-
-		// process potential collision
-		computeGridCollision(node, system, parameters);
-	}
-}
-
-void Solver::transferG2P(System& system, const SimParameters& parameters)
-{
-	// loop through part
-	for (int pi = 0; pi < system.partCount(); pi++) {
-		Particle& part = system.getPart(pi);
-
-		// reset velocity v_p and affine state B_p and velocity gradient ∇v_p
-		part.vel.setZero();
-		part.B.setZero();
-		part.velGradient.setZero();
-
-		// reference to kernel
-		const Interpolation& kernel = part.kernel;
-
-		// loop through kernel nodes
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				for (int k = 0; k < 3; k++) {
-
-					// compute grid frame coordinates of this iter's node
-					int gridX = kernel.node0.x() + i;
-					int gridY = kernel.node0.y() + j;
-					int gridZ = kernel.node0.z() + k;
-
-					// skip if out of bounds
-					if (!system.isInBounds(gridX, gridY, gridZ)) {
-						continue;
-					}
-
-					double   weight			= kernel.weight(i, j, k);
-					Vector3d weightGradient = kernel.weightGradient(i, j, k);
-
-					// reference to node
-					Node& node = system.getNode(gridX, gridY, gridZ);
-
-					// accumulate velocity v_i (eq 175)
-					part.vel += weight * node.vel;
-
-					// compute vector from part to node in world frame (x_i - x_p)
-					Vector3d vecPI = kernel.vecPI(i, j, k);
-
-					// acculumate affine state B_i (eq 176)
-					part.B += weight * node.vel * vecPI.transpose();
-
-					// accumulate node's deformation update (eq 181) aka velocity gradient
-					part.velGradient += node.vel * weightGradient.transpose();
-				}
-			}
-		}
-	}
-}
-
-void Solver::computeParticle(System& system, const SimParameters& parameters)
-{
-	for (int pi = 0; pi < system.partCount(); pi++) {
-		Particle& part = system.getPart(pi);
-
-		// update particle deformation gradient components
-		part.model->updateDeformDecomp(part.F_E, part.R_E, part.F_P, part.J_P, part.velGradient, parameters.timestep);
-
-		// old nearest node
-		Node& currentNode = system.getNode(part.pos);
-
-		// Advection
-		part.pos += parameters.timestep * part.vel;
-
-		// process potential collision
-		computeParticleCollision(part, system, parameters);
-
-		// update node ownership if needed
-		// current nearest node
-		Node& newNode = system.getNode(part.pos);
-
-		// update if different
-		if (&newNode != &currentNode) {
-			currentNode.ownedParticles.erase(&system.getPart(pi));
-
-			// insert into new node
-			newNode.ownedParticles.insert(&system.getPart(pi));
-		}
-	}
-}
-
 void Solver::computeGridExtForces(Node& node, const System& system, const SimParameters& parameters)
 {
 	// TODO: implement other external forces
@@ -238,21 +56,21 @@ void Solver::computeGridCollision(Node& node, const System& system, const SimPar
 	// enforce boundary conditions
 
 	// non-elastic boundaries
-	if (node.x < system.boundaryStart_	 // left wall
-		|| node.x > system.boundaryEnd_	// right wall
-		|| node.y > system.boundaryEnd_	// top wall (ceiling)
-		|| node.z < system.boundaryStart_  // back wall
-		|| node.z > system.boundaryEnd_) { // front wall
+	if (node.pos.x() < system.boundaryStart		// left wall
+		|| node.pos.x() > system.boundaryEnd	// right wall
+		|| node.pos.y() > system.boundaryEnd	// top wall (ceiling)
+		|| node.pos.z() < system.boundaryStart  // back wall
+		|| node.pos.z() > system.boundaryEnd) { // front wall
 		node.vel.setZero();
 	}
 
 	// elastic boundary
-	if (node.y < system.boundaryStart_) { // bottom wall (floor)
+	if (node.pos.y() < system.boundaryStart) { // bottom wall (floor)
 		node.vel.y() = std::max(0.0, node.vel.y());
 	}
 }
 
-void Solver::computeParticleCollision(Particle& part, const System& system, const SimParameters& parameters)
+void Solver::computeParticleCollision(Eigen::Vector3d& pos, Eigen::Vector3d& vel, const System& system, const SimParameters& parameters)
 {
 	// TODO: implement additional boundary conditions
 	// TODO: consider more sophisticated collision response (ex. coefficients of restitution, friction)
@@ -260,40 +78,40 @@ void Solver::computeParticleCollision(Particle& part, const System& system, cons
 	// enforce boundary conditions
 
 	// non-elastic boundaries
-	if (part.pos.x() < system.boundaryStart_) // left wall
+	if (pos.x() < system.boundaryStart) // left wall
 	{
-		part.pos(0) = system.boundaryStart_;
-		part.vel(0) = 0;
+		pos(0) = system.boundaryStart;
+		vel(0) = 0;
 	}
 
-	if (part.pos.x() > system.boundaryEnd_) // right wall
+	if (pos.x() > system.boundaryEnd) // right wall
 	{
-		part.pos(0) = system.boundaryEnd_;
-		part.vel(0) = 0;
+		pos(0) = system.boundaryEnd;
+		vel(0) = 0;
 	}
 
-	if (part.pos.z() < system.boundaryStart_) // back wall
+	if (pos.z() < system.boundaryStart) // back wall
 	{
-		part.pos(2) = system.boundaryStart_;
-		part.vel(2) = 0;
+		pos(2) = system.boundaryStart;
+		vel(2) = 0;
 	}
 
-	if (part.pos.z() > system.boundaryEnd_) // front wall
+	if (pos.z() > system.boundaryEnd) // front wall
 	{
-		part.pos(2) = system.boundaryEnd_;
-		part.vel(2) = 0;
+		pos(2) = system.boundaryEnd;
+		vel(2) = 0;
 	}
 
-	if (part.pos.y() > system.boundaryEnd_) // top wall (ceiling)
+	if (pos.y() > system.boundaryEnd) // top wall (ceiling)
 	{
-		part.pos(1) = system.boundaryEnd_;
-		part.vel(1) = 0;
+		pos(1) = system.boundaryEnd;
+		vel(1) = 0;
 	}
 
-	if (part.pos.y() < system.boundaryStart_) // bottom wall (floor)
+	if (pos.y() < system.boundaryStart) // bottom wall (floor)
 	{
-		part.pos(1) = system.boundaryStart_;
-		part.vel(1) = std::max(0.0, part.vel(1));
+		pos(1) = system.boundaryStart;
+		vel(1) = std::max(0.0, vel(1));
 	}
 }
 
@@ -312,12 +130,24 @@ void Solver::computeTotalEnergy(Stats& stats, const System& system)
 	stats.totalKineticEnergy   = 0;
 	stats.totalPotentialEnergy = 0;
 
-	for (int pi = 0; pi < system.partCount(); pi++) {
-		const Particle& part = system.getPart(pi);
+	// kinetic energy
+	for (int pi = 0; pi < system.partCount; pi++) {
+		const auto& mass = system.partMass[pi];
+		const auto& vel  = system.partVel[pi];
 
-		// kinetic energy
-		stats.totalKineticEnergy += 0.5 * part.mass0 * part.vel.squaredNorm();
-		stats.totalPotentialEnergy += part.model->computePotentialEnergy(part.F_E, part.R_E, part.F_P, part.vol0);
+		stats.totalKineticEnergy += 0.5 * mass * vel.squaredNorm();
+	}
+
+	// potential energy
+	for (int pi = 0; pi < system.partCount; pi++) {
+		const auto& model = system.partModel[pi];
+		const auto& vol0  = system.partVol0[pi];
+		const auto& F_E   = system.partF_E[pi];
+		const auto& R_E   = system.partR_E[pi];
+		const auto& F_P   = system.partF_P[pi];
+		const auto& J_P   = system.partJ_P[pi];
+
+		stats.totalPotentialEnergy += model->computePotentialEnergy(F_E, R_E, F_P, vol0);
 	}
 }
 

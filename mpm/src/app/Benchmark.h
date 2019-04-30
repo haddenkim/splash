@@ -9,7 +9,9 @@ class Solver;
 
 class Benchmark {
 public:
-	Benchmark(SolverType type, SystemStart start);
+	Benchmark(SolverType type, SystemStart start, int argc, char* argv[]);
+
+	void parseArgs(int argc, char* argv[]);
 
 	void run(int numSteps);
 

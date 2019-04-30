@@ -7,7 +7,7 @@
 struct Shape {
 	Shape(ModelType type, double cx, double cy, double cz, double vx, double vy, double vz, double r, double g, double b);
 
-	Eigen::Vector3d getRandomParticlePos();
+	Eigen::Vector3d getRandomParticlePos() const;
 
 	ModelType		type;
 	Eigen::Vector3d center;

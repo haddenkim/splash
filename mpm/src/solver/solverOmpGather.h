@@ -1,7 +1,8 @@
 #pragma once
-#include "solver/ompSolver.h"
+#include "settings/constants.h"
+#include "solver/solverOmp.h"
 
-class OmpGatherSolver : public OmpSolver {
+class SolverOmpGather : public SolverOmp {
 public:
 	std::string name() override { return "OpenMP Gather"; };
 
@@ -12,8 +13,4 @@ protected:
 	void transferG2P(System& system, const SimParameters& parameters) override;
 	void computeParticle(System& system, const SimParameters& parameters) override;
 
-	// helpers
-	void p2gPreComputeParts(System& system);
-	void p2gSetActiveNodes(System& system);
-	void p2gComputeNodes(System& system);
 };
