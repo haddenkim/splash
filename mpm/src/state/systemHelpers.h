@@ -178,13 +178,9 @@ static void reorderAllParticleData(System& system)
 
 	reorderParticleData(system.partVel, system);
 	reorderParticleData(system.partB, system);
-
-	reorderParticleData(system.partF_E, system);
-	reorderParticleData(system.partF_P, system);
-	reorderParticleData(system.partR_E, system);
-	reorderParticleData(system.partJ_P, system);
-
 	reorderParticleData(system.partColor, system);
+
+	assert(!"Need to implement partModel reorder");
 
 #pragma omp parallel for schedule(static)
 	for (int pi = 0; pi < system.partCount; pi++) {
