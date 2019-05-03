@@ -27,15 +27,10 @@ struct System {
 	// particle momentum
 	std::vector<double>			 partMass; //  mass
 	std::vector<Eigen::Vector3d> partVel;  // velocity
-	std::vector<Eigen::Matrix3d> partB;	// affine state
+	std::vector<Eigen::Matrix3d> partB;	// affine momentum
 
 	// particle deformation
 	std::vector<ConstitutiveModel*> partModel;
-	std::vector<double>				partVol0; // initial volume
-	std::vector<Eigen::Matrix3d>	partF_E;  // elastic part of deformation gradient F
-	std::vector<Eigen::Matrix3d>	partF_P;  // plastic part of deformation gradient F
-	std::vector<Eigen::Matrix3d>	partR_E;  // rotational decomposition of F_E
-	std::vector<double>				partJ_P;  // determinant of the plastic deformation gradient
 
 	// particle rendering
 	std::vector<Eigen::Vector3d> partColor;
@@ -47,9 +42,6 @@ struct System {
 	// boundaries
 	int boundaryStart;
 	int boundaryEnd;
-
-	// particle model(s)
-	std::vector<ConstitutiveModel*> constitutiveModels;
 
 	// reorder buffer
 	std::vector<double> partReorderBuffer;

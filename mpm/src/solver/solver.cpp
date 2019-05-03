@@ -140,14 +140,7 @@ void Solver::computeTotalEnergy(Stats& stats, const System& system)
 
 	// potential energy
 	for (int pi = 0; pi < system.partCount; pi++) {
-		const auto& model = system.partModel[pi];
-		const auto& vol0  = system.partVol0[pi];
-		const auto& F_E   = system.partF_E[pi];
-		const auto& R_E   = system.partR_E[pi];
-		const auto& F_P   = system.partF_P[pi];
-		const auto& J_P   = system.partJ_P[pi];
-
-		stats.totalPotentialEnergy += model->computePotentialEnergy(F_E, R_E, F_P, vol0);
+		stats.totalPotentialEnergy += system.partModel[pi]->computePotentialEnergy();
 	}
 }
 

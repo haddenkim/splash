@@ -80,11 +80,8 @@ void SolverOmpScatter::p2gSingleBlock(System& system, int bi)
 		int pi = system.particles[sortpi].dataIndex;
 
 		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
-		Matrix3d partVPFT = system.partModel[pi]->computeVolCauchyStress(system.partVol0[pi],
-																		 system.partF_E[pi],
-																		 system.partR_E[pi],
-																		 system.partJ_P[pi]);
-
+		Matrix3d partVPFT = system.partModel[pi]->computeVolCauchyStress();
+		
 		// pre-compute particle's interpolation
 		auto&		  partPos = system.partPos[pi];
 		Interpolation kernel(partPos);
@@ -198,12 +195,7 @@ void SolverOmpScatter::computeParticle(System& system, const SimParameters& para
 	for (int pi = 0; pi < system.partCount; pi++) {
 
 		// update particle deformation gradient components
-		system.partModel[pi]->updateDeformDecomp(system.partF_E[pi],
-												 system.partR_E[pi],
-												 system.partF_P[pi],
-												 system.partJ_P[pi],
-												 system.partVelGrad[pi],
-												 parameters.timestep);
+		system.partModel[pi]->updateDeformation(system.partVelGrad[pi], parameters.timestep);
 
 		// for convenience
 		auto& pos = system.partPos[pi];

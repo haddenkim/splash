@@ -1,40 +1,46 @@
 #pragma once
+
 #include "models/constitutiveModel.h"
+
+// Drucker-Prager Elastoplasticity for Sand Animation
 
 class SandModel : public ConstitutiveModel {
 public:
-	// Drucker-Prager sand
-	SandModel();
+	SandModel(double vol0);
 
-	// computes the elastic potential energy
-	double computePotentialEnergy(const Eigen::Matrix3d& F_E,
-								  const Eigen::Matrix3d& R_E,
-								  const Eigen::Matrix3d& F_P,
-								  double				 vol0) const override;
+	void updateDeformation(const Eigen::Matrix3d& velGradient, const double timestep) override;
 
-	// computes and updates the needed deformation gradients
-	void updateDeformDecomp(Eigen::Matrix3d&	   F_E,
-							Eigen::Matrix3d&	   R_E,
-							Eigen::Matrix3d&	   F_P,
-							double&				   J_P,
-							const Eigen::Matrix3d& velGradient,
-							const double&		   timestep) const override;
+	double			computePotentialEnergy() const override;
+	Eigen::Matrix3d computeVolCauchyStress() const override;
 
-	// computes current volume * cauchy stress V_p * σ_p
-	Eigen::Matrix3d computeVolCauchyStress(const double&		  vol0,
-										   const Eigen::Matrix3d& F_E,
-										   const Eigen::Matrix3d& R_E,
-										   const double&		  J_P) const override;
+	// given Σ and α , computes T (stored in Sig) and δq (stored in alpha)
+	void   projectToYieldSurface(Eigen::Vector3d& Sig, double& alpha) const;
+	double computeHardening(double q) const;
 
-	// computes First Piola Kirchoff Differential δP
-	Eigen::Matrix3d computeFirstPiolaKirchoffDifferential(const Eigen::Matrix3d& differentialF_E,
-														  const Eigen::Matrix3d& F_E,
-														  const double&			 J_P) const override;
+	// for rendering
+	virtual double getElastic() const override;
+	virtual double getPlastic() const override;
 
-private:
-	// helper
-	void project(Eigen::Matrix3d& F_E, double& alpha) const;
+	// for GUI
+	std::string getGui() const ;
 
-	double mu0_;	 // μ shear modulus
-	double lambda0_; // λ Lame's first parameter
+	// data
+	double			vol0_;  // initial volume
+	Eigen::Matrix3d F_E_;   // elastic deformation gradient
+	double			alpha_; // yield surface size
+	double			q_;		// hardening state
+
+	// material properties
+	static const double E_;		 // E Young's Modulus
+	static const double nu_;	 // ν Poisson ratio
+	static const double mu_;	 // μ shear modulus
+	static const double lambda_; // λ Lame's first parameter
+
+	static const double h0_;
+	static const double h1_;
+	static const double h2_;
+	static const double h3_;
+
+	// precompute for convenience/optimiation
+	static const double sqrtTwoThirds_;
 };

@@ -1,63 +1,134 @@
-#include "sandModel.h"
+#include "models/sandModel.h"
+#include <Eigen/Dense>
+#include <cmath>
 
 using namespace Eigen;
 
-SandModel::SandModel()
+// (Klar table 3)
+const double SandModel::E_		= 3.537e5;
+const double SandModel::nu_		= 0.3;
+const double SandModel::mu_		= E_ / (2 * (1 + nu_));
+const double SandModel::lambda_ = E_ * nu_ / ((1 + nu_) * (1 - 2 * nu_));
+
+// Note: Klar provides parameters in degrees, so converted here to radians
+const double SandModel::h0_			   = 35 * M_PI / 180;
+const double SandModel::h1_			   = 9 * M_PI / 180;
+const double SandModel::h2_			   = 0.2 * M_PI / 180;
+const double SandModel::h3_			   = 10 * M_PI / 180;
+const double SandModel::sqrtTwoThirds_ = sqrt(2.0 / 3.0);
+
+SandModel::SandModel(double vol0)
+	: vol0_(vol0)
+	, F_E_(Matrix3d::Identity())
+	, q_(1)
+	, alpha_(computeHardening(q_))
 {
 }
 
-double SandModel::computePotentialEnergy(const Eigen::Matrix3d& F_E,
-										 const Eigen::Matrix3d& R_E,
-										 const Eigen::Matrix3d& F_P,
-										 double					vol0) const
+void SandModel::updateDeformation(const Eigen::Matrix3d& velGradient, const double timestep)
 {
-	return 0;
-}
 
-void SandModel::updateDeformDecomp(Eigen::Matrix3d&		  F_E,
-								   Eigen::Matrix3d&		  R_E,
-								   Eigen::Matrix3d&		  F_P,
-								   double&				  J_P,
-								   const Eigen::Matrix3d& velGradient,
-								   const double&		  timestep) const
-{
-	double alpha;
+	// compute elastic deformation gradient, before plasticity F̂_E (Klar eq 16)
+	Matrix3d F_E_hat = (Matrix3d::Identity() + timestep * velGradient) * F_E_;
 
-	// compute updated elastic deformation gradient F̂_E (D-P eq 16)
-	Matrix3d F_E_hat = (Matrix3d::Identity() + timestep * velGradient) * F_E;
-
-	project(F_E_hat, alpha);
-}
-
-Eigen::Matrix3d SandModel::computeVolCauchyStress(const double&			 vol0,
-												  const Eigen::Matrix3d& F_E,
-												  const Eigen::Matrix3d& R_E,
-												  const double&			 J_P) const
-{
-	JacobiSVD<Matrix3d> svd(F_E, ComputeFullU | ComputeFullV);
+	// SVD of F̂_E
+	JacobiSVD<Matrix3d> svd(F_E_hat, ComputeFullU | ComputeFullV);
 	Matrix3d			U   = svd.matrixU();		// U
 	Vector3d			Sig = svd.singularValues(); // Σ
 	Matrix3d			V   = svd.matrixV();		// V
 
-	// lnΣ defined as logarithm of diagonal entries (para above D-P eq 26)
-	Matrix3d lnSig  = Sig.array().log().matrix().asDiagonal();
-	Matrix3d invSig = Sig.cwiseInverse().asDiagonal();
+	// compute T (stored in Sig) and δq (stored in alpha)
+	projectToYieldSurface(Sig, alpha_);
 
-	// (D-P eq 26)
-	Matrix3d P = U * (2 * mu0_ * invSig * lnSig + lambda0_ * lnSig.trace() * invSig) * V.transpose();
+	// update F_E
+	F_E_ = U * Sig.asDiagonal() * V.transpose();
 
-	return vol0 * P * F_E.transpose();
+	// update hardening (Klar eq 29 - 31)
+	q_ += alpha_;
+	alpha_ = computeHardening(q_);
 }
 
-// computes First Piola Kirchoff Differential δP
-Eigen::Matrix3d SandModel::computeFirstPiolaKirchoffDifferential(const Eigen::Matrix3d& differentialF_E,
-																 const Eigen::Matrix3d& F_E,
-																 const double&			J_P) const
+double SandModel::computePotentialEnergy() const
 {
-	assert(!"not yet implemented");
-	return Matrix3d::Identity();
 }
 
-void SandModel::project(Eigen::Matrix3d& F_E, double& alpha) const
+Eigen::Matrix3d SandModel::computeVolCauchyStress() const
 {
+	// SVD of F_E
+	JacobiSVD<Matrix3d> svd(F_E_, ComputeFullU | ComputeFullV);
+	Matrix3d			U   = svd.matrixU();		// U
+	Vector3d			Sig = svd.singularValues(); // Σ
+	Matrix3d			V   = svd.matrixV();		// V
+
+	// Klar para above eq 26
+	Matrix3d lnSig  = Sig.array().log().matrix().asDiagonal();	 // lnΣ
+	Matrix3d invSig = Sig.array().inverse().matrix().asDiagonal(); // Σ^-1
+
+	// Klar eq 26
+	Matrix3d P = U * (2 * mu_ * invSig * lnSig + lambda_ * lnSig.trace() * invSig) * V.transpose();
+
+	return vol0_ * P * F_E_.transpose();
+}
+
+void SandModel::projectToYieldSurface(Eigen::Vector3d& Sig, double& alpha) const
+{
+	// compute ϵ and ϵ̂  (Klar eq 27)
+	Vector3d e		   = Sig.array().log();
+	double   eTrace	= e.array().sum();
+	Vector3d e_hat	 = e - eTrace / 3 * Vector3d::Ones();
+	double   e_hatNorm = e_hat.norm();
+
+	// Case II
+	if (e_hatNorm == 0 || eTrace > 0) {
+		Sig   = Vector3d::Ones();
+		alpha = e_hatNorm;
+		return;
+	}
+
+	// compute amount of plastic deformation δγ (Klar eq 27)
+	// small optimization: store δγ in alpha
+	alpha = e_hatNorm + ((3 * lambda_ * 0.5 / mu_) + 1) * eTrace * alpha;
+
+	// Case I
+	if (alpha <= 0) { // δγ <= 0
+		alpha = 0;
+		return;
+	}
+
+	// Case III
+	else {
+		// (Klar eq 28) note δγ is in alpha
+		Vector3d H = e - alpha * e_hat / e_hatNorm;
+
+		// e^H
+		Sig = H.array().exp();
+		// alpha already = δγ
+		return;
+	}
+}
+
+double SandModel::computeHardening(double q) const
+{
+	// (Klar eq 30)
+	double phi = h0_ + (h1_ * q_ - h3_) * exp(-h2_ * q_);
+	// phi			  = 30 * M_PI / 180; // debug
+	double sinPhi = sin(phi);
+
+	// (Klar eq 31)
+	return sqrtTwoThirds_ * 2 * sinPhi / (3 - sinPhi);
+}
+
+// for rendering
+double SandModel::getElastic() const
+{
+}
+
+double SandModel::getPlastic() const
+{
+}
+
+// for GUI
+std::string SandModel::getGui() const
+{
+	return "q:\t" + std::to_string(q_) + "\nalpha\t:" + std::to_string(alpha_) + "\n";
 }

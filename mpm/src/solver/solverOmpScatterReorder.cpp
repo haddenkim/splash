@@ -42,10 +42,7 @@ void SolverOmpScatterReorder::p2gSingleBlock(System& system, int bi)
 		int pi = sortpi;
 
 		// for convenience / optimization, pre-compute part constant contribution to node force VPFT
-		Matrix3d partVPFT = system.partModel[pi]->computeVolCauchyStress(system.partVol0[pi],
-																		 system.partF_E[pi],
-																		 system.partR_E[pi],
-																		 system.partJ_P[pi]);
+		Matrix3d partVPFT = system.partModel[pi]->computeVolCauchyStress();
 
 		// pre-compute particle's interpolation
 		auto&		  partPos = system.partPos[pi];

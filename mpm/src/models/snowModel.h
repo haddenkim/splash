@@ -1,54 +1,36 @@
 #pragma once
+
 #include "models/constitutiveModel.h"
 
 class SnowModel : public ConstitutiveModel {
 public:
-	// Stomakhin Snow model and default parameters (stom Table 2)
-	// lowered E from 1.4e5 to 1e4 to induce more fracturing
-	SnowModel(double thetaC = 2.5e-2, // θ_c critical compression
-			  double thetaS = 7.5e-3, // θ_s critical stretch
-			  double xi		= 10.0,   // ξ hardening coefficient
-			  double E0		= 1e4,	// E_0 initial Young's Modulus
-			  double nu		= 0.2);		  // ν Poisson ratio
+	SnowModel(double vol0);
 
-	// computes the elastic potential energy
-	double computePotentialEnergy(const Eigen::Matrix3d& F_E,
-								  const Eigen::Matrix3d& R_E,
-								  const Eigen::Matrix3d& F_P,
-								  double				 vol0) const override;
+	void updateDeformation(const Eigen::Matrix3d& velGradient, const double timestep) override;
 
-	// computes and updates the needed deformation gradients
-	void updateDeformDecomp(Eigen::Matrix3d&	   F_E,
-							Eigen::Matrix3d&	   R_E,
-							Eigen::Matrix3d&	   F_P,
-							double&				   J_P,
-							const Eigen::Matrix3d& velGradient,
-							const double&		   timestep) const override;
+	double			computePotentialEnergy() const override;
+	Eigen::Matrix3d computeVolCauchyStress() const override;
+	void			computeMuLambda(double& mu, double& lambda, const double& J_P) const;
 
-	// computes current volume * cauchy stress V_p * σ_p
-	Eigen::Matrix3d computeVolCauchyStress(const double&		  vol0,
-										   const Eigen::Matrix3d& F_E,
-										   const Eigen::Matrix3d& R_E,
-										   const double&		  J_P) const override;
+	// for rendering
+	virtual double getElastic() const override;
+	virtual double getPlastic() const override;
+	
+	// for GUI
+	std::string getGui() const ;
 
-	// computes First Piola Kirchoff Differential δP
-	Eigen::Matrix3d computeFirstPiolaKirchoffDifferential(const Eigen::Matrix3d& differentialF_E,
-														  const Eigen::Matrix3d& F_E,
-														  const double&			 J_P) const override;
+	// data
+	double			vol0_;
+	Eigen::Matrix3d F_E_;
+	Eigen::Matrix3d F_P_;
+	Eigen::Matrix3d R_E_;
 
-private:
-	// helper functions
-	void computeMuLambda(double& mu, double& lambda, const double& J_P) const;
-
-	Eigen::Matrix3d computeDifferentialJFinvT(const Eigen::Matrix3d& differentialF_E, const Eigen::Matrix3d& F_E) const;
-
-	Eigen::Matrix3d computeDifferentialR(const Eigen::Matrix3d& differentialF_E,
-										 const Eigen::Matrix3d& R_E,
-										 const Eigen::Matrix3d& S_E) const;
-
-	double thetaC_;  // θ_c critical compression
-	double thetaS_;  // θ_s critical stretch
-	double xi_;		 // ξ hardening coefficient
-	double mu0_;	 // μ shear modulus
-	double lambda0_; // λ Lame's first parameter
+	// material properties
+	static const double thetaC_;  // θ_c critical compression
+	static const double thetaS_;  // θ_s critical stretch
+	static const double xi_;	  // ξ hardening coefficient
+	static const double E0_;	  // E initial Young's Modulus
+	static const double nu_;	  // ν Poisson ratio
+	static const double mu0_;	 // μ shear modulus
+	static const double lambda0_; // λ Lame's first parameter
 };

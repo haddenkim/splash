@@ -18,10 +18,6 @@ void SystemSetup::initSystem(System& system, const SystemStart& start, int partC
 	// setup grid
 	setupGrid(system);
 
-	// setup models
-	system.constitutiveModels.emplace_back(new SnowModel()); // snow 0
-	system.constitutiveModels.emplace_back(new SandModel()); // sand 1
-
 	// setup particles
 	addShapes(system, start.shapes, partCount);
 
@@ -44,18 +40,11 @@ void SystemSetup::clearParticles(System& system)
 	system.partB.clear();
 
 	system.partModel.clear();
-	system.partVol0.clear();
-	system.partF_E.clear();
-	system.partF_P.clear();
-	system.partR_E.clear();
-	system.partJ_P.clear();
 
 	system.partColor.clear();
 
 	system.partVelGrad.clear();
 	system.partReorderBuffer.clear();
-
-	system.constitutiveModels.clear();
 }
 
 void SystemSetup::setupGrid(System& system)
@@ -110,9 +99,8 @@ void SystemSetup::addShapes(System& system, const std::vector<Shape>& shapes, in
 void SystemSetup::addPart(System& system, ModelType type, Eigen::Vector3d pos, Eigen::Vector3d velocity, Eigen::RowVector3d color)
 {
 	// TODO allow for alternative initial state
-	double mass  = 1;
-	double vol   = 1;
-	auto   model = system.constitutiveModels[0];
+	double mass = 1;
+	double vol  = 1;
 
 	int bi = computeBlockIndex(pos);
 
@@ -125,12 +113,19 @@ void SystemSetup::addPart(System& system, ModelType type, Eigen::Vector3d pos, E
 	system.partVel.push_back(velocity);
 	system.partB.push_back(Matrix3d::Zero());
 
-	system.partModel.push_back(model);
-	system.partVol0.push_back(vol);
-	system.partF_E.push_back(Matrix3d::Identity());
-	system.partF_P.push_back(Matrix3d::Identity());
-	system.partR_E.push_back(Matrix3d::Identity());
-	system.partJ_P.push_back(1);
+	switch (type) {
+	case MODEL_SNOW:
+		system.partModel.push_back(new SnowModel(vol));
+		break;
+
+	case MODEL_SAND:
+		system.partModel.push_back(new SandModel(vol));
+		break;
+
+	default:
+		assert(!"Invalid ModelType");
+		break;
+	}
 
 	system.partColor.push_back(color);
 

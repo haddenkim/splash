@@ -162,13 +162,11 @@ void MpmHook::updateRenderGeometry()
 
 			switch (renderSettings_.colorSetting) {
 			case RenderSettings::CLR_ELASTIC: {
-				const auto& F_E					   = system_.partF_E[pi];
-				particleColors_.block<1, 3>(pi, 0) = mapColor(F_E.determinant(), 1, 0.01);
+				particleColors_.block<1, 3>(pi, 0) = mapColor(system_.partModel[pi]->getElastic(), 1, 0.01);
 			} break;
 
 			case RenderSettings::CLR_PLASTIC: {
-				const auto& J_P					   = system_.partJ_P[pi];
-				particleColors_.block<1, 3>(pi, 0) = mapColor(J_P, 1, 0.01);
+				particleColors_.block<1, 3>(pi, 0) = mapColor(system_.partModel[pi]->getPlastic(), 1, 0.01);
 			} break;
 
 			default: // CLR_PARTICLE
