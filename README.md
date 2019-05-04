@@ -9,8 +9,6 @@ The second goal of this project is to learn and implement various parallel progr
 
 Splash uses [libigl](https://libigl.github.io/) for rendering.
 
-## 
-
 
 ## Features/TODO
 * [x] Serial Explicit MPM
@@ -45,7 +43,7 @@ Untested.
 ## Usage
 From the binary directory (build/bin/)
 ```
-./splash
+./splash_collide
 ```
 
 ## Demo
