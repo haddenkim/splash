@@ -4,7 +4,7 @@
 
 using namespace ImGui;
 
-StatsUI::StatsUI(const Stats& stats)
+StatsUI::StatsUI(Stats& stats)
 	: stats_(stats)
 {
 }
@@ -62,7 +62,7 @@ void StatsUI::draw()
 		Text("%10i . %03i", stats_.totTimeGrid / 1000, stats_.totTimeGrid % 1000);
 		NextColumn();
 
-		Text("P2G");
+		Text("G2P");
 		NextColumn();
 		Text("%10i . %03i", stats_.timeG2P / 1000, stats_.timeG2P % 1000);
 		NextColumn();
@@ -102,5 +102,23 @@ void StatsUI::draw()
 		Columns(1);
 	}
 
+	NewLine();
+
+	Text("Implicit Only");
+	Text("Solve Steps %i", stats_.solveSteps);
+	Text("Solve Final Residual %f", stats_.solveFinalResidual);
+
+	ImGui::PlotLines("Residual", stats_.solveResidual, 30, 0, NULL, 0, 3.402823466e+38F, ImVec2(0, 200));
+
+	NewLine();
+
+	ImGui::Checkbox("Track Energy", &stats_.trackEnergy);
+	if (stats_.trackEnergy) {
+		Text("Kinetic\t %f", stats_.totalKineticEnergy);
+		Text("Potential\t %f", stats_.totalPotentialEnergy);
+		Text("Total\t %f", stats_.totalKineticEnergy + stats_.totalPotentialEnergy);
+	}
+
 	End();
+
 }

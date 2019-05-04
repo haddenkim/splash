@@ -16,18 +16,40 @@ void RenderUI::draw()
 
 	ImGui::SliderFloat("Point Size", &renderSettings_.pointSize, 0.1f, 20.0f);
 	ImGui::SliderFloat("Line Width", &renderSettings_.lineWidth, 0.1f, 10.0f);
-	ImGui::InputFloat("Vector Scaling", &renderSettings_.vectorScale, 0.f, 0.f, 5);
+	if (ImGui::InputFloat("Vector Scaling", &renderSettings_.vectorScale, 0.f, 0.f, 5)) {
+		renderSettings_.visibilityChanged = true;
+	}
+	ImGui::NewLine();
+
+	if (ImGui::Combo("Color", (int*)&renderSettings_.colorSetting, "Particle\0Elastic\0Plastic\0Partition\0Index\0\0")) {
+		renderSettings_.colorChanged = true;
+	}
+	ImGui::NewLine();
 
 	ImGui::Text("Show:");
-	ImGui::Checkbox("Particles", &renderSettings_.showParticles);
-	ImGui::Checkbox("Particle Velocity", &renderSettings_.showParticleVelocity);
+	if (ImGui::Checkbox("Particles", &renderSettings_.showParticles)) {
+		renderSettings_.visibilityChanged = true;
+	}
+	if (ImGui::Checkbox("Particle Velocity", &renderSettings_.showParticleVelocity)) {
+		renderSettings_.visibilityChanged = true;
+	}
 
 	ImGui::NewLine();
-	ImGui::Checkbox("Active Grid", &renderSettings_.showActiveGrid);
-	ImGui::Checkbox("Full Grid", &renderSettings_.showGrid);
-	ImGui::Checkbox("Grid Velocity", &renderSettings_.showGridVelocity);
-	ImGui::Checkbox("Grid Force", &renderSettings_.showGridForce);
+	if (ImGui::Checkbox("Active Grid", &renderSettings_.showActiveGrid)) {
+		renderSettings_.visibilityChanged = true;
+	}
+	if (ImGui::Checkbox("Full Grid", &renderSettings_.showGrid)) {
+		renderSettings_.visibilityChanged = true;
+	}
+	if (ImGui::Checkbox("Grid Velocity", &renderSettings_.showGridVelocity)) {
+		renderSettings_.visibilityChanged = true;
+	}
+	if (ImGui::Checkbox("Grid Force", &renderSettings_.showGridForce)) {
+		renderSettings_.visibilityChanged = true;
+	}
 
 	ImGui::NewLine();
-	ImGui::Checkbox("World Boundary", &renderSettings_.showBoundary);
+	if (ImGui::Checkbox("World Boundary", &renderSettings_.showBoundary)) {
+		renderSettings_.visibilityChanged = true;
+	}
 }

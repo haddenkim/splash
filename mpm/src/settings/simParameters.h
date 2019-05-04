@@ -1,4 +1,5 @@
 #pragma once
+#include "settings/constants.h"
 #include <omp.h>
 #include <string>
 #include <vector>
@@ -9,17 +10,17 @@ struct SimParameters {
 		// default settings
 		selectedSolver = 0;
 
-		timestep = 1e-4;
+		timestep = 1e-3;
 		numSteps = 1000;
 
-		particlesPerObject = 10000;
+		particlesPerObject = PARTS_PER_OBJECT;
 
 		gravityEnabled = true;
-		gravityG	   = 200;
+		gravityG	   = 10;
 
-		B				= 1.f;
-		solveTolerance  = 1e-4;
-		solveMaxIters   = 20;
+		B			   = 1.f;
+		solveTolerance = 1e-4;
+		solveMaxIters  = 20;
 
 		// set max threads
 		numThreads   = omp_get_num_procs();
@@ -39,9 +40,9 @@ struct SimParameters {
 	float gravityG;
 
 	// implicit solver parameters
-	float B;			   // β interpolation weight
-	int   solveMaxIters;   //
-	float solveTolerance;  // τ
+	float B;			  // β interpolation weight
+	int   solveMaxIters;  //
+	float solveTolerance; // τ
 
 	// OpenMP solver parameters
 	int numThreads;

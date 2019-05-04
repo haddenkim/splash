@@ -1,33 +1,48 @@
 #pragma once
+
 #include "models/constitutiveModel.h"
+#include "settings/constants.h"
 #include "state/node.h"
 #include "state/particle.h"
+
+#include <Eigen/Core>
+#include <array>
+#include <omp.h>
 #include <vector>
 
-class System {
-public:
-	System();
+struct System {
 
-	void clear();
-	void addCube(int partCount, Eigen::Vector3d center, Eigen::Vector3d velocity, Eigen::RowVector3d color);
+	// node data
+	std::array<Node, WORLD_NUM_NODES>		   nodes;
+	std::array<NodeBlock, WORLD_NUM_BLOCKS>	blocks;
+	std::array<NodeSet, WORLD_NUM_SETS>		   sets;
+	std::array<NodeNeighbors, WORLD_NUM_NODES> neighbors;
 
-	// grid dimensions
-	static const int gridSize_ = 51;					// number of nodes in each dimension
-	const double	 dx_	   = 1.0 / (gridSize_ - 1); // ∆x distance between nodes
+	// particle data
+	int							 partCount; // number of particles in ssytem (for convenience)
+	bool						 partDataSorted;
+	std::vector<ParticleBase>	particles; // sort indices
+	std::vector<Eigen::Vector3d> partPos;   // position
 
-	// array of particle structs
-	std::vector<Particle> particles_;
+	// particle momentum
+	std::vector<double>			 partMass; //  mass
+	std::vector<Eigen::Vector3d> partVel;  // velocity
+	std::vector<Eigen::Matrix3d> partB;	// affine momentum
 
-	// x , y , z order of grid nodes
-	Node nodes_[gridSize_][gridSize_][gridSize_];
+	// particle deformation
+	std::vector<ConstitutiveModel*> partModel;
 
+	// particle rendering
+	std::vector<Eigen::Vector3d> partColor;
+
+	// temps
+	std::vector<Eigen::Matrix3d> partVelGrad;
+
+	// TODO: create more sophisticated boundary conditions
 	// boundaries
-	double boundary_ = 0.05;
+	int boundaryStart;
+	int boundaryEnd;
 
-	// particle modes
-	ConstitutiveModel constitutiveModel_;
-
-private:
-	//helpers
-	void setupGrid();
+	// reorder buffer
+	std::vector<double> partReorderBuffer;
 };
