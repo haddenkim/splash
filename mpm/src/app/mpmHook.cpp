@@ -23,7 +23,6 @@ MpmHook::MpmHook(SystemStart start)
 	solvers_.emplace_back(new SolverOmpScatter());
 	solvers_.emplace_back(new SolverOmpScatterReorder());
 
-
 	// solvers_.emplace_back(new OmpPartitionSolver());
 	// solvers_.emplace_back(new OmpSolver());
 	// solvers_.emplace_back(new Solver());
@@ -119,7 +118,7 @@ bool MpmHook::simulateOneStep()
 		renderSettings_.colorChanged = true;
 	}
 
-	if (simParameters_.numSteps == stats_.stepCount) {
+	if (stats_.stepCount >= simParameters_.numSteps && stats_.stepCount < simParameters_.numSteps + renderSettings_.drawInverval) {
 		pause();
 	}
 
@@ -161,13 +160,13 @@ void MpmHook::updateRenderGeometry()
 		for (int pi = 0; pi < system_.partCount; pi++) {
 
 			switch (renderSettings_.colorSetting) {
-			case RenderSettings::CLR_ELASTIC: {
-				particleColors_.block<1, 3>(pi, 0) = mapColor(system_.partModel[pi]->getElastic(), 1, 0.01);
-			} break;
+			case RenderSettings::CLR_ELASTIC:
+				particleColors_.block<1, 3>(pi, 0) = mapColor(system_.partModel[pi]->getRenderElastic());
+				break;
 
-			case RenderSettings::CLR_PLASTIC: {
-				particleColors_.block<1, 3>(pi, 0) = mapColor(system_.partModel[pi]->getPlastic(), 1, 0.01);
-			} break;
+			case RenderSettings::CLR_PLASTIC:
+				particleColors_.block<1, 3>(pi, 0) = mapColor(system_.partModel[pi]->getRenderPlastic());
+				break;
 
 			default: // CLR_PARTICLE
 				particleColors_.block<1, 3>(pi, 0) = system_.partColor[pi];
@@ -288,18 +287,17 @@ void MpmHook::writePNG(igl::opengl::glfw::Viewer& viewer)
 	pngCount++;
 }
 
-Eigen::RowVector3d MpmHook::mapColor(double value, double base, double max)
+Eigen::RowVector3d MpmHook::mapColor(double value)
 {
-	// normalize
-	double delta = (value - base) / max;
+	// value is expected to be normalized [-1, 1]
 
 	// positive -> red
-	if (delta > 0) {
-		return Eigen::RowVector3d(delta, 0, 0); // red
+	if (value > 0) {
+		return Eigen::RowVector3d(value, 0, 0); // red
 
 	} else {
 		// negative -> blue
-		return Eigen::RowVector3d(0, 0, -delta); // blue
+		return Eigen::RowVector3d(0, 0, -value); // blue
 	}
 
 	// // normalize, invert and bucket

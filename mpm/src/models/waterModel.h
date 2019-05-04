@@ -13,8 +13,8 @@ public:
 	void			computeMuLambda(double& mu, double& lambda, const double& J_P) const;
 
 	// for rendering
-	virtual double getElastic() const override;
-	virtual double getPlastic() const override;
+	virtual double getRenderElastic() const override;
+	virtual double getRenderPlastic() const override;
 
 	// data
 	double vol0_; //

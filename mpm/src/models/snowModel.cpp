@@ -92,12 +92,12 @@ void SnowModel::computeMuLambda(double& mu, double& lambda, const double& J_P) c
 }
 
 // for rendering
-double SnowModel::getElastic() const
+double SnowModel::getRenderElastic() const
 {
 	return F_E_.determinant();
 }
 
-double SnowModel::getPlastic() const
+double SnowModel::getRenderPlastic() const
 {
 	return F_P_.determinant();
 }

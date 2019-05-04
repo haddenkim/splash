@@ -10,6 +10,7 @@ using namespace ImGui;
 SystemUI::SystemUI(const System& system)
 	: system_(system)
 {
+	showParticles_ = true;
 }
 
 void SystemUI::draw()
@@ -19,9 +20,9 @@ void SystemUI::draw()
 	SetNextWindowSize(ImVec2(200, 160), ImGuiSetCond_FirstUseEver);
 	Begin("System", nullptr, ImGuiWindowFlags_NoSavedSettings);
 
-	Checkbox("Particles", &showParticles_);
-	Checkbox("Nodes", &showNodes_);
-	Checkbox("Links", &showLinks_);
+	// Checkbox("Particles", &showParticles_);
+	// Checkbox("Nodes", &showNodes_);
+	// Checkbox("Links", &showLinks_);
 
 	if (showParticles_) {
 		displayParticleData();

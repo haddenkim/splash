@@ -60,7 +60,6 @@ set(libs ${libs} OpenMP::OpenMP_CXX)
 # set(libs ${libs} ${OpenMP_CXX_FLAGS})
 
 
-
 # MPI
 # find_package(MPI REQUIRED)
 # set(libs ${libs}  ${MPI_C_LIBRARIES})

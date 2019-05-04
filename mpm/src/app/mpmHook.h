@@ -30,7 +30,7 @@ public:
 
 	//
 	void			   writePNG(igl::opengl::glfw::Viewer& viewer);
-	Eigen::RowVector3d mapColor(double value, double base, double max);
+	Eigen::RowVector3d mapColor(double value);
 
 	// libigl render data
 	bool renderNeedsUpdate_;

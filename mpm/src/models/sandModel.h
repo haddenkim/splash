@@ -18,8 +18,8 @@ public:
 	double computeHardening(double q) const;
 
 	// for rendering
-	virtual double getElastic() const override;
-	virtual double getPlastic() const override;
+	virtual double getRenderElastic() const override;
+	virtual double getRenderPlastic() const override;
 
 	// for GUI
 	std::string getGui() const ;

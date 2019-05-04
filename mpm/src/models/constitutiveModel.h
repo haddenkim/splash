@@ -10,8 +10,8 @@ public:
 	virtual Eigen::Matrix3d computeVolCauchyStress() const = 0;
 
 	// for rendering
-	virtual double getElastic() const = 0;
-	virtual double getPlastic() const = 0;
+	virtual double getRenderElastic() const = 0;
+	virtual double getRenderPlastic() const = 0;
 
 	// for GUI
 	virtual std::string getGui() const = 0;

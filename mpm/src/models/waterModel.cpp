@@ -15,7 +15,6 @@ WaterModel::WaterModel(double vol0)
 
 void WaterModel::updateDeformation(const Eigen::Matrix3d& velGradient, const double timestep)
 {
-	// Tamp eq 12
 
 }
 
@@ -32,10 +31,10 @@ void WaterModel::computeMuLambda(double& mu, double& lambda, const double& J_P) 
 }
 
 // for rendering
-double WaterModel::getElastic() const
+double WaterModel::getRenderElastic() const
 {
 }
 
-double WaterModel::getPlastic() const
+double WaterModel::getRenderPlastic() const
 {
 }

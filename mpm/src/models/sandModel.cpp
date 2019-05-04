@@ -50,6 +50,18 @@ void SandModel::updateDeformation(const Eigen::Matrix3d& velGradient, const doub
 
 double SandModel::computePotentialEnergy() const
 {
+	// SVD of F_E
+	JacobiSVD<Matrix3d> svd(F_E_, ComputeFullU | ComputeFullV);
+	Matrix3d			U   = svd.matrixU();		// U
+	Vector3d			Sig = svd.singularValues(); // Σ
+	Matrix3d			V   = svd.matrixV();		// V
+
+	// Klar para above eq 26
+	Vector3d lnSig	= Sig.array().log();			  // lnΣ
+	double   trlnSig  = lnSig.sum();				  // tr(lnΣ)
+	double   trln2Sig = lnSig.array().square().sum(); // tr((lnΣ)^2)
+
+	return mu_ * trln2Sig + 0.5 * lambda_ * trlnSig * trlnSig;
 }
 
 Eigen::Matrix3d SandModel::computeVolCauchyStress() const
@@ -119,16 +131,33 @@ double SandModel::computeHardening(double q) const
 }
 
 // for rendering
-double SandModel::getElastic() const
+double SandModel::getRenderElastic() const
 {
+	return (F_E_.determinant() - 1) * 100;
 }
 
-double SandModel::getPlastic() const
+double SandModel::getRenderPlastic() const
 {
+	return (q_ - 1) / 5;
 }
 
 // for GUI
 std::string SandModel::getGui() const
 {
-	return "q:\t" + std::to_string(q_) + "\nalpha\t:" + std::to_string(alpha_) + "\n";
+	std::string ret;
+
+	// deformation gradient
+	ret = "F_E\n";
+	ret += std::to_string(F_E_(0, 0)) + "\t" + std::to_string(F_E_(0, 1)) + "\t" + std::to_string(F_E_(0, 2)) + "\n";
+	ret += std::to_string(F_E_(1, 0)) + "\t" + std::to_string(F_E_(1, 1)) + "\t" + std::to_string(F_E_(1, 2)) + "\n";
+	ret += std::to_string(F_E_(2, 0)) + "\t" + std::to_string(F_E_(2, 1)) + "\t" + std::to_string(F_E_(2, 2)) + "\n\n";
+
+	// determinant
+	ret += "J_E:\t" + std::to_string(F_E_.determinant()) + "\n";
+
+	// hardening
+	ret += "q:\t" + std::to_string(q_) + "\n";
+	ret += "alpha\t:" + std::to_string(alpha_) + "\n";
+
+	return ret;
 }
