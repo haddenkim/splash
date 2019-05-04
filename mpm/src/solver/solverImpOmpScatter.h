@@ -2,7 +2,7 @@
 #include "settings/constants.h"
 #include "solver/solverOmp.h"
 
-class SolverOmpScatter : public SolverOmp {
+class SolverImpOmpScatter : public SolverOmp {
 public:
 	std::string name() override { return "OpenMP Scatter"; };
 

@@ -6,8 +6,10 @@
 
 // #include "solver/ompSolver.h"
 // #include "solver/serialImplicitCRSolver.h"
+// #include "solver/solverOmpScatterReorder.h"
+
 #include "solver/solverOmpScatter.h"
-#include "solver/solverOmpScatterReorder.h"
+#include "solver/solverImpOmpScatter.h"
 
 // TODO clean up linking lodepng
 #include "../../lib/lodepng/lodepng.h"
@@ -21,12 +23,13 @@ MpmHook::MpmHook(SystemStart start)
 {
 	// available solvers
 	solvers_.emplace_back(new SolverOmpScatter());
-	solvers_.emplace_back(new SolverOmpScatterReorder());
+	solvers_.emplace_back(new SolverImpOmpScatter());
 
 	// solvers_.emplace_back(new OmpPartitionSolver());
 	// solvers_.emplace_back(new OmpSolver());
 	// solvers_.emplace_back(new Solver());
 	// solvers_.emplace_back(new SerialImplicitCRSolver());
+	// solvers_.emplace_back(new SolverOmpScatterReorder());
 
 	// set solver names for gui
 	simParameters_.solverNames = new char*[solvers_.size()];
